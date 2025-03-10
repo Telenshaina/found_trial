@@ -1,34 +1,47 @@
 import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TextInput, Button } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TextInput, TouchableOpacity } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
+
+// Define navigation types
+type RootStackParamList = {
+  Login: undefined;
+  Account: undefined;
+};
+
+type NavigationProps = StackNavigationProp<RootStackParamList, "Account">;
 
 type AccountProps = {
   setIsLoggedIn: React.Dispatch<React.SetStateAction<boolean>>;
 };
 
 const Account: React.FC<AccountProps> = ({ setIsLoggedIn }) => {
+  const navigation = useNavigation<NavigationProps>();
+
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    navigation.replace("Login");
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.accountTitle}>Account</Text>
-      
-      {/* Profile Section */}
       <View style={styles.profileContainer}>
         <View style={styles.avatarPlaceholder} />
         <Text style={styles.name}>Juan Dela Cruz</Text>
         <Text style={styles.role}>STUDENT</Text>
       </View>
-
-      {/* Information Fields */}
       <View style={styles.infoContainer}>
         <Text style={styles.label}>EMAIL</Text>
         <TextInput style={styles.input} value="juan.delacruz@neu.edu.ph" editable={false} />
-
         <Text style={styles.label}>STUDENT ID</Text>
         <TextInput style={styles.input} value="22-01345-678" editable={false} />
-
         <Text style={styles.label}>PHONE NUMBER</Text>
-        <TextInput style={styles.input} value="+63 090 1234 567" editable={false} />
-        <Button title="Sign Out" onPress={() => setIsLoggedIn(false)} />
-      </View> 
+        <TextInput style={styles.input} value="+63 090 1234 567" editable={false}/>
+      </View>
+      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+        <Text style={styles.logoutText}>Logout</Text>
+      </TouchableOpacity>
     </SafeAreaView>
   );
 };
@@ -37,6 +50,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+    paddingHorizontal: 20,
   },
   accountTitle: {
     fontSize: 22,
@@ -64,7 +78,6 @@ const styles = StyleSheet.create({
     color: 'gray',
   },
   infoContainer: {
-    paddingHorizontal: 20,
     marginTop: 20,
   },
   label: {
@@ -81,6 +94,18 @@ const styles = StyleSheet.create({
     padding: 10,
     fontSize: 14,
     backgroundColor: '#f9f9f9',
+  },
+  logoutButton: {
+    marginTop: 40,
+    backgroundColor: '#FF3B30',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  logoutText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 

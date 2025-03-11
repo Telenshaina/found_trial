@@ -33,7 +33,7 @@ const Header: React.FC<HeaderProps> = ({ showSearch = false }) => {
           <Feather name="search" size={20} color="#666" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search by name or category..."
+            placeholder="Search by category or tags..."
             placeholderTextColor="#666"
             value={searchQuery}
             onChangeText={setSearchQuery}

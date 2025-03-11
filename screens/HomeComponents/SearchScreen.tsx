@@ -6,9 +6,14 @@ import {
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { supabase } from '../../supabase';
 import { Feather } from '@expo/vector-icons';
+import { StackNavigationProp } from '@react-navigation/stack';
 
+type RootStackParamList = {
+  ItemDetails: { item: any };
+};
+type NavigationProp = StackNavigationProp<RootStackParamList, 'ItemDetails'>;
 const SearchScreen: React.FC = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList, 'ItemDetails'>>();
   const route = useRoute();
   const { query } = route.params as { query: string };
 
@@ -20,27 +25,26 @@ const SearchScreen: React.FC = () => {
     console.log("🔍 Search query:", query);
 
     const fetchItems = async () => {
-        setLoading(true);
-        try {
-          const { data, error } = await supabase.from('lost_items').select('*');
-      
-          if (error) throw error;
-      
-          const filteredResults = data.filter(item =>
-            item.category.toLowerCase().includes(query.toLowerCase()) ||
-            item.item_name.toLowerCase().includes(query.toLowerCase()) ||
-            (Array.isArray(item.tags) && item.tags.some((tag: string) => tag.toLowerCase().includes(query.toLowerCase()))) // Ensure tags is an array
-          );
-      
-          console.log("✅ Fetched items:", filteredResults);
-          setSearchResults(filteredResults);
-        } catch (error) {
-          console.error("❌ Error fetching items:", error);
-        } finally {
-          setLoading(false);
-        }
-      };
-      
+      setLoading(true);
+      try {
+        const { data, error } = await supabase.from('lost_items').select('*');
+
+        if (error) throw error;
+
+        const filteredResults = data.filter(item =>
+          item.category.toLowerCase().includes(query.toLowerCase()) ||
+          item.item_name.toLowerCase().includes(query.toLowerCase()) ||
+          (Array.isArray(item.tags) && item.tags.some((tag: string) => tag.toLowerCase().includes(query.toLowerCase())))
+        );
+
+        console.log("✅ Fetched items:", filteredResults);
+        setSearchResults(filteredResults);
+      } catch (error) {
+        console.error("❌ Error fetching items:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
     fetchItems();
   }, [query]);
@@ -64,14 +68,17 @@ const SearchScreen: React.FC = () => {
           data={searchResults}
           keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
           renderItem={({ item }) => (
-            <View style={styles.resultItem}>
+            <TouchableOpacity 
+              style={styles.resultItem} 
+              onPress={() => navigation.navigate('ItemDetails', { item })}
+            >
               <Image source={{ uri: item.image_url }} style={styles.image} />
               <View style={styles.details}>
                 <Text style={styles.resultTitle}>{item.item_name}</Text>
                 <Text style={styles.resultCategory}>{item.category}</Text>
                 <Text style={styles.date}>{new Date(item.date_found).toLocaleDateString()}</Text>
               </View>
-            </View>
+            </TouchableOpacity>
           )}
         />
       )}

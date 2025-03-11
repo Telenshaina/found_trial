@@ -12,11 +12,11 @@ const Home = () => {
       <Header showSearch={true}/>
       <ScrollView style={styles.scrollView}>
         <View style={styles.content}>
-            <QuickActions />
-            <LastAccessed />
-            <RecentlyUploaded />
-            <CategorySection title="#Umbrella" />
-            <CategorySection title="#Ballpen" />
+          <QuickActions />
+          <LastAccessed />
+          <RecentlyUploaded />
+          <CategorySection title="#Umbrella" />
+          <CategorySection title="#Ballpen" />
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -24,18 +24,9 @@ const Home = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-    padding: 16,
-    gap: 24,
-  },
+  container: { flex: 1, backgroundColor: '#fff' },
+  scrollView: { flex: 1 },
+  content: { flex: 1, padding: 16, gap: 24 },
 });
 
 export default Home;

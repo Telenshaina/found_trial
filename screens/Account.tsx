@@ -1,5 +1,5 @@
-import React from "react";
-import { View, Text, StyleSheet, SafeAreaView, TextInput, TouchableOpacity, Alert } from "react-native";
+import React, { useEffect, useState } from "react";
+import { View, Text, StyleSheet, SafeAreaView, TextInput, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { supabase } from "../supabase";
@@ -12,75 +12,122 @@ type RootStackParamList = {
 
 type NavigationProps = StackNavigationProp<RootStackParamList, "Account">;
 
-type AccountProps = {
-  setIsLoggedIn: React.Dispatch<React.SetStateAction<boolean>>;
-};
-
-const Account: React.FC<AccountProps> = ({ setIsLoggedIn }) => {
+const Account: React.FC = () => {
   const navigation = useNavigation<NavigationProps>();
+
+  const [loading, setLoading] = useState<boolean>(true);
+  const [userData, setUserData] = useState<{
+    name: string;
+    email: string;
+    studentId: string;
+    phoneNumber: string;
+  } | null>(null);
+
+  // 🔹 Fetch user details from Supabase
+  useEffect(() => {
+    const fetchUserDetails = async () => {
+      setLoading(true);
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+
+        if (error || !user) {
+          throw new Error("User not found");
+        }
+
+        const { full_name, student_id, phone_number } = user.user_metadata;
+
+        setUserData({
+          name: full_name || "Unknown User",
+          email: user.email || "No Email",
+          studentId: student_id || "N/A",
+          phoneNumber: phone_number || "N/A",
+        });
+      } catch (error) {
+        console.error("Error fetching user:", error);
+        Alert.alert("Error", "Failed to load account details.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserDetails();
+  }, []);
 
   const handleLogout = async () => {
     try {
       // ✅ Fetch the current user
-      const { data: { user } } = await supabase.auth.getUser();
-
-      if (!user) {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
         Alert.alert("Error", "No user found.");
         return;
       }
-
-      const userEmail = user.email || "Unknown User";
-
-      // ✅ Log the logout activity
-      const { error } = await supabase.from("user_logs").insert([
-        {
-          user_id: userEmail, // Use the user's email as the user_id
-          activity_type: "logout",
-          timestamp: new Date(),
-        },
-      ]);
-
-      if (error) {
-        console.error("Error logging out:", error.message);
+  
+      const userId = user.id;  
+      const { error: logError } = await supabase
+        .from("user_logs")  
+        .insert([
+          {
+            user_id: userId, 
+            activity_type: "logout",
+            timestamp: new Date().toISOString(),
+          },
+        ]);
+  
+      if (logError) {
+        console.error("Error logging logout:", logError.message);
       } else {
-        console.log(`✅ Logout recorded for user: ${userEmail}`);
+        console.log(`Logout recorded for user: ${userId}`);
       }
-
-      // ✅ Log out from Supabase
+  
       await supabase.auth.signOut();
-
-      // ✅ Navigate to Login
-      setIsLoggedIn(false);
+  
       navigation.replace("Login");
+  
     } catch (error) {
       console.error("Logout Error:", error);
       Alert.alert("Logout Failed", "Something went wrong. Please try again.");
     }
   };
+  
 
   return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.accountTitle}>Account</Text>
-      <View style={styles.profileContainer}>
-        <View style={styles.avatarPlaceholder} />
-        <Text style={styles.name}>Juan Dela Cruz</Text>
-        <Text style={styles.role}>STUDENT</Text>
-      </View>
-      <View style={styles.infoContainer}>
-        <Text style={styles.label}>EMAIL</Text>
-        <TextInput style={styles.input} value="juan.delacruz@neu.edu.ph" editable={false} />
-        <Text style={styles.label}>STUDENT ID</Text>
-        <TextInput style={styles.input} value="22-01345-678" editable={false} />
-        <Text style={styles.label}>PHONE NUMBER</Text>
-        <TextInput style={styles.input} value="+63 090 1234 567" editable={false} />
-      </View>
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Text style={styles.logoutText}>Logout</Text>
-      </TouchableOpacity>
+
+      {loading ? (
+        <ActivityIndicator size="large" color="#d32f2f" style={{ marginTop: 20 }} />
+      ) : (
+        userData && (
+          <>
+            <View style={styles.profileContainer}>
+              <View style={styles.avatarPlaceholder} />
+              <Text style={styles.name}>{userData.name}</Text>
+              <Text style={styles.role}>STUDENT</Text>
+            </View>
+
+            <View style={styles.infoContainer}>
+              <Text style={styles.label}>EMAIL</Text>
+              <TextInput style={styles.input} value={userData.email} editable={false} />
+
+              <Text style={styles.label}>STUDENT ID</Text>
+              <TextInput style={styles.input} value={userData.studentId} editable={false} />
+
+              <Text style={styles.label}>PHONE NUMBER</Text>
+              <TextInput style={styles.input} value={userData.phoneNumber} editable={false} />
+            </View>
+
+            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+              <Text style={styles.logoutText}>Logout</Text>
+            </TouchableOpacity>
+          </>
+        )
+      )}
     </SafeAreaView>
   );
 };
 
+// 🔹 Styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,

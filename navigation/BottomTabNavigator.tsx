@@ -1,9 +1,9 @@
-import React, { SetStateAction } from 'react';
+import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Image, View } from 'react-native';
 import HomeScreen from '../screens/Home';
 import ChatScreen from '../screens/Chat';
-import UploadScreen from '../screens/Upload';
+import Upload from '../screens/Upload';
 import NotificationScreen from '../screens/Notification';
 import AccountScreen from '../screens/Account';
 
@@ -33,10 +33,6 @@ const getTabBarIcon = (routeName: string, focused: boolean) => {
 };
 
 const BottomTabNavigator: React.FC = () => {
-  function setIsLoggedIn(value: SetStateAction<boolean>): void {
-    throw new Error('Function not implemented.');
-  }
-
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -47,11 +43,9 @@ const BottomTabNavigator: React.FC = () => {
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Chat" component={ChatScreen} />
-      <Tab.Screen name="Upload" component={UploadScreen} />
+      <Tab.Screen name="Upload" component={Upload} />
       <Tab.Screen name="Notification" component={NotificationScreen} />
-      <Tab.Screen name="Account">{() => <AccountScreen setIsLoggedIn={setIsLoggedIn} />}
-      </Tab.Screen>
-
+      <Tab.Screen name="Account" component={AccountScreen} />
     </Tab.Navigator>
   );
 };

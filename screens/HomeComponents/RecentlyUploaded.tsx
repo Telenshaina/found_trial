@@ -20,7 +20,7 @@ const RecentlyUploaded = () => {
     const fetchItems = async () => {
       setLoading(true);
       const { data, error } = await supabase
-        .from('lost_items')
+        .from('found_items')
         .select('*')
         .order('date_found', { ascending: false })
         .limit(6);

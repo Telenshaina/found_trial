@@ -14,7 +14,27 @@ interface RootStackParamList extends Record<string, object | undefined> {
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
+const logUserActivity = async (userId: string, name: string, email: string, activityType: string, userType: string) => {
+  const { error } = await supabase.from("user_logs").insert([
+    {
+      user_id: userId,
+      name: name,
+      email: email,
+      user_type: userType, // "Institutional" or "Guest"
+      activity_type: activityType,
+      timestamp: new Date(),
+    },
+  ]);
+
+  if (error) {
+    console.error("Error inserting log:", error.message);
+  } else {
+    console.log(`${activityType} activity recorded for ${userType} user: ${name} (${email})`);
+  }
+};  
+
 const Tab = createMaterialTopTabNavigator();
+
 
 const Login: React.FC = () => (
   <View style={styles.container}>
@@ -41,43 +61,23 @@ const InstitutionalLogin: React.FC = () => {
 
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth Event:", event);
-      console.log("Session:", session);
-
       if (session?.user?.email?.endsWith("@neu.edu.ph")) {
-        const fullName = session.user.user_metadata?.full_name || "Unknown User";
-
-        // ✅ Log the login using full name as user_id
-        await logUserActivity(fullName, "login");
-
+        const { id: userId, email, user_metadata } = session.user;
+        const name = user_metadata.full_name;
+  
+        await logUserActivity(userId, name, email, "Institutional", "login");
         navigation.replace("Main");
       } else if (session) {
         Alert.alert("Unauthorized", "Only institutional accounts can log in on this tab. Try logging in as a guest.");
         supabase.auth.signOut();
       }
     });
-
+  
     return () => {
       authListener.subscription.unsubscribe();
     };
   }, []);
 
-  // ✅ Function to log user activity
-  const logUserActivity = async (userName: string, activityType: string) => {
-    const { error } = await supabase.from("user_logs").insert([
-      {
-        user_id: userName, // Use full name as the user_id
-        activity_type: activityType,
-        timestamp: new Date(), // Current timestamp
-      },
-    ]);
-
-    if (error) {
-      console.error("Error inserting log:", error.message);
-    } else {
-      console.log(`✅ ${activityType} activity recorded for user: ${userName}`);
-    }
-  };
   
   // 🔹 Handle Google Sign-In
   const handleGoogleSignIn = async () => {
@@ -101,6 +101,8 @@ const InstitutionalLogin: React.FC = () => {
     }
   };
 
+  
+
   return (
     <View style={styles.loginContainer}>
       <Text style={styles.description}>
@@ -121,22 +123,36 @@ const GuestLogin: React.FC = () => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("Auth Event:", event);
       console.log("Session:", session);
-
-      if (session?.user?.email?.endsWith("@gmail.com")) {
+  
+      if (session?.user) {
+        console.log("User Object:", session.user);
+  
+        const userId = session.user.id;
+        const email = session.user.email; // 🔍 Debugging here
+        const name = session.user.user_metadata?.full_name || "Guest User";
+  
+        if (!email) {
+          console.error("Email is undefined! Check the session object.");
+          return;
+        }
+  
+        const userType = email.endsWith("@gmail.com") ? "Guest" : "Institutional";
+  
+        await logUserActivity(userId, name, email, "login", userType);
         navigation.replace("Setup");
-      } else if (session) {
-        Alert.alert("Unauthorized", "Only Gmail accounts can log in as a guest.");
-        supabase.auth.signOut();
       }
     });
-
+  
     return () => {
       authListener.subscription.unsubscribe();
     };
   }, []);
+  
+  
+  
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
@@ -158,6 +174,8 @@ const GuestLogin: React.FC = () => {
       setLoading(false);
     }
   };
+
+  
 
   return (
     <View style={styles.loginContainer}>

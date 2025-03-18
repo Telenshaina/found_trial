@@ -1,27 +1,36 @@
-import React,  { useState } from "react";
+import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import BottomTabNavigator from "./navigation/BottomTabNavigator";
 import Login from "./screens/Login";
-import SearchScreen from "./screens/HomeComponents/SearchScreen";
-import ItemDetailsScreen from "./screens/HomeComponents/ItemDetailsScreen"; 
 import Setup from "./screens/Setup";
-type RootStackParamList = {
+import SearchScreen from "./screens/HomeComponents/SearchScreen";
+import ItemDetailsScreen from "./screens/HomeComponents/ItemDetailsScreen";
+import Home from "./screens/Home";
+import Upload from "./screens/Upload";
+import LostItemUploadScreen from "./screens/HomeComponents/LostItemUploadScreen";
+import FoundItemUploadScreen from "./screens/HomeComponents/FoundItemUploadScreen";
+import AuthChecker from "./screens/AuthChecker"; 
+export type RootStackParamList = {
+  AuthChecker: undefined; 
   Login: undefined;
   Main: undefined;
   Setup: undefined;
+  Home: undefined;
   SearchScreen: { query: string };
-  ItemDetails: { item: any }; 
+  ItemDetails: { item: any };
+  Upload: undefined;
+  LostItemUploadScreen: undefined;
+  FoundItemUploadScreen: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
 
 const App = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(true); 
-  
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="AuthChecker" component={AuthChecker} /> 
         <Stack.Screen name="Login" component={Login} />
         <Stack.Screen name="Setup" component={Setup} />
         <Stack.Screen name="Main" component={BottomTabNavigator} />
@@ -31,6 +40,11 @@ const App = () => {
           component={ItemDetailsScreen} 
           options={{ title: "Item Details", headerShown: true }} 
         />
+        <Stack.Screen name="Home" component={Home} />
+        <Stack.Screen name="Upload" component={Upload} />
+        <Stack.Screen name="LostItemUploadScreen" component={LostItemUploadScreen} />
+        <Stack.Screen name="FoundItemUploadScreen" component={FoundItemUploadScreen} />
+        
       </Stack.Navigator>
     </NavigationContainer>
   );

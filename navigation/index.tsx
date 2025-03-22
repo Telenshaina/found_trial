@@ -3,7 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Image, View } from 'react-native';
 import HomeScreen from '../screens/Home';
 import ChatScreen from '../screens/Chat';
-import UploadScreen from '../screens/UploadScreen';
+import UploadScreen from '../screens/Upload';
 import NotificationScreen from '../screens/Notification';
 import AccountScreen from '../screens/Account';
 import getTabBarIcon from '../utils/getTabBarIcon'; // Ensure this path is correct

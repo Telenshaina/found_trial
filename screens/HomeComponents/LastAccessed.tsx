@@ -1,46 +1,73 @@
-import React from "react";
-import { View, Text, ScrollView, StyleSheet } from "react-native";
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../../navigation/types'; 
 
 const LastAccessed = () => {
+
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+
+  const [lastAccessed, setLastAccessed] = useState<any | null>(null);
+
+  const fetchLastAccessed = async () => {
+    try {
+      const savedItem = await AsyncStorage.getItem('lastAccessed');
+      if (savedItem) {
+        setLastAccessed(JSON.parse(savedItem));
+      }
+    } catch (error) {
+      console.error('Error loading last accessed item:', error);
+    }
+  };
+
+  //this will fetch all of the recent clicked and store on async storage.
+  useEffect(() => {
+    fetchLastAccessed();
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchLastAccessed();
+    }, [])
+  );
+
   return (
-    <View style={styles.container}>
+    <View style={styles.section}>
       <Text style={styles.title}>Last Accessed</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        {[...Array(5)].map((_, index) => (
-          <View key={index} style={styles.item}>
-            <View style={styles.placeholder} />
-            <Text style={styles.itemTitle}>Title</Text>
+      {lastAccessed ? (
+        <TouchableOpacity
+          style={styles.card}
+          onPress={() => {
+            console.log("Navigating to ItemDetails with:", lastAccessed);
+            navigation.navigate('ItemDetails', { item: lastAccessed }); 
+          }}
+        >
+          <Image source={{ uri: lastAccessed.image_url }} style={styles.image} />
+          <View style={styles.details}>
+            <Text style={styles.category}>{lastAccessed.category}</Text>
+            <Text style={styles.itemTitle}>{lastAccessed.item_name}</Text>
+            <Text style={styles.date}>{new Date(lastAccessed.date_found).toLocaleDateString()}</Text>
           </View>
-        ))}
-      </ScrollView>
+        </TouchableOpacity>
+      ) : (
+        <Text style={styles.noItemsText}>No items accessed recently.</Text>
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: 600,
-    marginBottom: 16,
-  },
-  item: {
-    alignItems: "center",
-    marginRight: 12,
-  },
-  placeholder: {
-    width: 120,
-    height: 120,
-    backgroundColor: "#ddd",
-    borderRadius: 8,
-  },
-  itemTitle: {
-    marginTop: 4,
-    fontSize: 12,
-    color: "#333",
-  },
+  section: { marginBottom: 20 },
+  title: { fontSize: 18, fontWeight: '600', marginBottom: 10 },
+  card: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 8, padding: 10, elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4 },
+  image: { width: 60, height: 60, borderRadius: 8, backgroundColor: '#f1f5f9', marginRight: 10 },
+  details: { flex: 1 },
+  category: { fontSize: 12, color: '#666' },
+  itemTitle: { fontSize: 14, fontWeight: '500' },
+  date: { fontSize: 12, color: '#666' },
+  noItemsText: { fontSize: 16, color: '#666', textAlign: 'center', marginTop: 20 },
 });
 
 export default LastAccessed;

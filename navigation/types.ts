@@ -1,7 +1,7 @@
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RouteProp } from "@react-navigation/native";
 
-// Define the navigation params
+// routing of params and class
 export type RootStackParamList = {
   Home: undefined;
   SearchScreen: { query: string };
@@ -10,6 +10,7 @@ export type RootStackParamList = {
   Notification: undefined;
   Chat: undefined;
   Account: undefined;
+  ItemDetails: { item: any }; 
 };
 
 // Type for navigation prop

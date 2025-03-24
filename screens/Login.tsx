@@ -83,16 +83,30 @@ const InstitutionalLogin: React.FC = () => {
   const handleGoogleSignIn = async () => {
     setLoading(true);
     try {
-      const redirectUri = AuthSession.makeRedirectUri();
+      const redirectUri = AuthSession.makeRedirectUri({
+        native: "found-neu-1://", 
+       
 
-      // Start Google OAuth flow
+
+      });
+  
+      console.log("Redirect URI:", redirectUri);
+  
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: redirectUri },
+        options: {
+          redirectTo: redirectUri,
+        },
       });
-
+  
       if (error) throw error;
-      console.log("Login initiated. Waiting for session...");
+  
+      if (data?.url) {
+        console.log("Opening browser with:", data.url);
+        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
+        console.log("Browser result:", result);
+        // The auth state change listener should pick up the session after this
+      }
     } catch (error) {
       console.error("Login Error:", error);
       Alert.alert("Login Failed", "Something went wrong. Please try again.");
@@ -100,6 +114,8 @@ const InstitutionalLogin: React.FC = () => {
       setLoading(false);
     }
   };
+  
+  
 
   
 

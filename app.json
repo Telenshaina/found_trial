@@ -1,7 +1,11 @@
 {
   "expo": {
     "scheme": "found-neu-1",
-    "platforms": ["ios", "android", "web"],
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
     "name": "found-neu-1",
     "slug": "found-neu-1",
     "version": "1.0.0",
@@ -18,13 +22,31 @@
       "supportsTablet": true
     },
     "android": {
+      
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.kelt.foundneu1"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/neu-logo.png"
+    },
+    "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": {
+            "scheme": "found-neu-1", 
+            "host": "auth"
+          },
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ],
+    "extra": {
+      "eas": {
+        "projectId": "c59241e8-b450-455d-a83b-3f54c255d7ed"
+      }
     }
+    
   }
 }

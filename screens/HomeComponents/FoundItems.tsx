@@ -27,17 +27,56 @@ const FoundItems: React.FC<FoundItemsProps> = ({ onItemsGrouped }) => {
         .from('found_items')
         .select('*')
         .order('date_found', { ascending: false });
-
+  
       if (error) {
         console.error('Error fetching items:', error);
-      } else {
-        setItems(data || []);
+        setLoading(false);
+        return;
       }
-      setLoading(false);
-    };
+  
+      const foundByIds = data?.map(item => item.found_by) || [];
 
+  
+      const { data: institutionalUsers, error: institutionalError } = await supabase
+  .from('institutional_users')
+        .select('id, role')
+        .in('id', foundByIds);
+
+      if (institutionalError) {
+        console.error('Error fetching institutional users:', institutionalError);
+      }
+
+      const { data: guestUsers, error: guestError } = await supabase
+        .from('guest_users')
+        .select('id')
+        .in('id', foundByIds);
+
+      if (guestError) {
+        console.error('Error fetching guest users:', guestError);
+      }
+
+  
+        const itemsWithSource = data.map(item => {
+          const isInstitutional = institutionalUsers?.find(u => u.id === item.found_by);
+          const isGuest = guestUsers?.find(g => g.id === item.found_by);
+          return {
+            ...item,
+            userType: isInstitutional ? 'Institutional' : isGuest ? 'Guest' : 'Unknown',
+            role: isInstitutional?.role ?? null,
+          };
+        });
+        
+  
+      setItems(itemsWithSource);
+      
+      setLoading(false);
+      console.log('Found items:', data);
+
+    };
+  
     fetchItems();
   }, []);
+  
 
   useEffect(() => {
     if (onItemsGrouped) {
@@ -97,9 +136,14 @@ const FoundItems: React.FC<FoundItemsProps> = ({ onItemsGrouped }) => {
                 >
                   <Image source={{ uri: item.image_url }} style={styles.image} />
                   <View style={styles.details}>
-                    <Text style={styles.itemTitle}>{item.item_name}</Text>
-                    <Text style={styles.date}>{new Date(item.date_found).toLocaleDateString()}</Text>
-                  </View>
+                  {item.userType === 'Guest' && (
+                    <Text style={styles.guestTag}>Posted by Guest</Text>
+                  )}
+                  <Text style={styles.itemTitle}>{item.item_name}</Text>
+                  <Text style={styles.date}>{new Date(item.date_found).toLocaleDateString()}</Text>
+                </View>
+
+
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -120,6 +164,18 @@ const styles = StyleSheet.create({
   itemTitle: { fontSize: 14, fontWeight: '500' },
   date: { fontSize: 12, color: '#666' },
   noItemsText: { fontSize: 16, color: '#666', textAlign: 'center', marginTop: 20 },
+  guestTag: {
+    backgroundColor: '#FFD700',
+    color: '#333',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    fontSize: 10,
+    fontWeight: 'bold',
+    alignSelf: 'flex-start',
+    marginTop: 4,
+  },
+  
 });
 
 export default FoundItems;

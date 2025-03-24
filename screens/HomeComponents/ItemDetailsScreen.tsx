@@ -170,7 +170,17 @@ const ItemDetailsScreen = ({ route }: { route: any }) => {
           </View>
         </View>
 
-        <Text style={styles.postedBy}>Found by: @{foundByUser || 'Loading...'}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+          <Text style={styles.postedBy}>
+            Found by: @{foundByUser || 'Loading...'}
+          </Text>
+          {(!foundByUser || foundByUser.toLowerCase().includes('guest')) && (
+            <View style={styles.guestTag}>
+              <Text style={styles.guestTagText}>Guest</Text>
+            </View>
+          )}
+        </View>
+
 
         <View style={styles.badgeContainer}>
           <View style={styles.categoryBadge}>
@@ -317,6 +327,20 @@ const styles = StyleSheet.create({
   unclaimedText: { fontSize: 12, color: '#9D174D', fontWeight: 'bold' },
 
   postedBy: { fontSize: 12, color: '#6B7280', marginTop: 4 },
+  guestTag: {
+    backgroundColor: '#FFD700',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginLeft: 8,
+  },
+  guestTagText: {
+    color: '#333',
+    
+    fontWeight: 'bold',
+    fontSize: 10,
+  },
+  
 
   badgeContainer: { flexDirection: 'row', marginTop: 8 },
   categoryBadge: { backgroundColor: '#EDE9FE', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },

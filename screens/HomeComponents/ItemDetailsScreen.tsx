@@ -99,7 +99,7 @@ const ItemDetailsScreen = ({ route }: { route: any }) => {
   
     let proofUrl = null;
   
-    // 🟢 Upload image only if an image is selected
+    //  Upload image only if an image is selected
     if (proofImage) {
       try {
         const response = await fetch(proofImage);
@@ -174,11 +174,13 @@ const ItemDetailsScreen = ({ route }: { route: any }) => {
           <Text style={styles.postedBy}>
             Found by: @{foundByUser || 'Loading...'}
           </Text>
-          {(!foundByUser || foundByUser.toLowerCase().includes('guest')) && (
-            <View style={styles.guestTag}>
-              <Text style={styles.guestTagText}>Guest</Text>
-            </View>
-          )}
+          {item.found_by === 'guest' && (
+          <View style={styles.guestTag}>
+            <Text style={styles.guestTagText}>Guest</Text>
+          </View>
+)}
+
+          
         </View>
 
 

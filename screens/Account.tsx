@@ -23,39 +23,79 @@ const Account: React.FC = () => {
     phoneNumber: string;
   } | null>(null);
 
+  // New state variables for editable fields
+  const [studentId, setStudentId] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+
   // 🔹 Fetch user details from Supabase
   useEffect(() => {
     const fetchUserDetails = async () => {
       setLoading(true);
       try {
         const { data: { user }, error } = await supabase.auth.getUser();
-
+  
         if (error || !user) {
           throw new Error("User not found");
         }
-
-        const { full_name, student_id, phone_number } = user.user_metadata;
-
+  
+        // Extract email domain
+        const emailDomain = user.email?.split("@")[1] || "";
+        const table = emailDomain === "neu.edu.ph" ? "institutional_users" : "guest_users";
+  
+        // Fetch user details from the appropriate table
+        const { data: userDetails, error: userDetailsError } = await supabase
+          .from(table)
+          .select("name, student_id, phone_number")
+          .eq("id", user.id)
+          .single();
+  
+        if (userDetailsError || !userDetails) {
+          throw new Error(`User details not found in ${table}`);
+        }
+  
+        // Set user data
         setUserData({
-          name: full_name || "Unknown User",
+          name: userDetails.name || "Unknown User",
           email: user.email || "No Email",
-          studentId: student_id || "N/A",
-          phoneNumber: phone_number || "N/A",
+          studentId: userDetails.student_id || "",
+          phoneNumber: userDetails.phone_number || "",
         });
+        setStudentId(userDetails.student_id || "");
+        setPhoneNumber(userDetails.phone_number || "");
       } catch (error) {
-        console.error("Error fetching user:", error);
         Alert.alert("Error", "Failed to load account details.");
       } finally {
         setLoading(false);
       }
     };
-
     fetchUserDetails();
   }, []);
 
+  const updateUserData = async (field: "student_id" | "phone_number", value: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("No user found");
+      
+      const emailDomain = user.email?.split("@")[1] || "";
+      const table = emailDomain === "neu.edu.ph" ? "institutional_users" : "guest_users";
+      
+      const { error } = await supabase
+        .from(table)
+        .update({ [field]: value })
+        .eq("id", user.id);
+      
+      if (error) throw error;
+      Alert.alert("Success", "Information updated successfully");
+    } catch (error) {
+      Alert.alert("Error", "Failed to update information");
+    }
+  };
+  
+  
+
   const handleLogout = async () => {
     try {
-      // ✅ Fetch the current user
+      // Fetch the current user
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       
       if (userError || !user) {
@@ -64,24 +104,60 @@ const Account: React.FC = () => {
       }
   
       const userId = user.id;  
+      const userEmail = user.email || "No Email";
+  
+      console.log("🔹 User Data:", user); // Debugging
+  
+      // Fetch user details from "profiles" table
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")  
+        .select("*")  
+        .eq("id", userId)  
+        .single();
+  
+      if (profileError || !profile) {
+        console.error("❌ Profile fetch error:", profileError?.message || "Profile not found");
+      } else {
+        console.log("✅ Profile Data:", profile);
+      }
+  
+      // Extract name from profile OR user metadata
+      let userName = profile?.full_name || user.user_metadata?.full_name || "Unknown User";
+  
+      console.log("👤 Final User Name:", userName);
+  
+      // Determine user type based on email
+      let userType = null;
+      if (userEmail.endsWith("@neu.edu.ph")) {
+        userType = "Institutional";
+      } else if (userEmail.endsWith("@gmail.com")) {
+        userType = "Guest";
+      }
+  
+      console.log("📩 Email:", userEmail, " | 🏷️ User Type:", userType);
+  
+      // Log the logout activity
       const { error: logError } = await supabase
         .from("user_logs")  
         .insert([
           {
             user_id: userId, 
+            name: userName,
+            email: userEmail,
+            user_type: userType,  // ✅ Ensured user type is logged
             activity_type: "logout",
             timestamp: new Date().toISOString(),
           },
         ]);
   
       if (logError) {
-        console.error("Error logging logout:", logError.message);
+        console.error("❌ Error logging logout:", logError.message);
       } else {
-        console.log(`Logout recorded for user: ${userId}`);
+        console.log(`✅ Logout recorded: ${userId} | ${userName} | ${userEmail} | ${userType}`);
       }
   
+      // Perform logout
       await supabase.auth.signOut();
-  
       navigation.replace("Login");
   
     } catch (error) {
@@ -89,6 +165,9 @@ const Account: React.FC = () => {
       Alert.alert("Logout Failed", "Something went wrong. Please try again.");
     }
   };
+
+  
+  
   
 
   return (
@@ -111,10 +190,24 @@ const Account: React.FC = () => {
               <TextInput style={styles.input} value={userData.email} editable={false} />
 
               <Text style={styles.label}>STUDENT ID</Text>
-              <TextInput style={styles.input} value={userData.studentId} editable={false} />
+              <TextInput
+              style={styles.input}
+              value={userData.studentId}
+              onChangeText={(text) => setUserData({ ...userData, studentId: text })}
+              onSubmitEditing={() => updateUserData("student_id", userData.studentId)}
+              placeholder="Enter Student ID Here"
+              placeholderTextColor="#A9A9A9" // Gray ghost text
+              />
 
               <Text style={styles.label}>PHONE NUMBER</Text>
-              <TextInput style={styles.input} value={userData.phoneNumber} editable={false} />
+              <TextInput
+              style={styles.input}
+              value={userData.phoneNumber}
+              onChangeText={(text) => setUserData({ ...userData, phoneNumber: text })}
+              onSubmitEditing={() => updateUserData("phone_number", userData.phoneNumber)}
+              placeholder="Enter Phone Number Here"
+              placeholderTextColor="#A9A9A9" // Gray ghost text
+            />
             </View>
 
             <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>

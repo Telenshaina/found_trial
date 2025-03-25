@@ -11,6 +11,8 @@ import Home from "./screens/Home";
 import Upload from "./screens/Upload";
 import LostItemUploadScreen from "./screens/HomeComponents/LostItemUploadScreen";
 import FoundItemUploadScreen from "./screens/HomeComponents/FoundItemUploadScreen";
+import TransactionPage from "./screens/HomeComponents/TransactionPage";
+import ClaimDetailsScreen from "./screens/HomeComponents/ClaimDetailsScreen";
 import AuthChecker from "./screens/AuthChecker"; 
 
 export type RootStackParamList = {
@@ -25,6 +27,9 @@ export type RootStackParamList = {
   Upload: undefined;
   LostItemUploadScreen: undefined;
   FoundItemUploadScreen: undefined;
+  TransactionPage: undefined;
+  ClaimDetailsScreen: { claim: any };
+
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -52,7 +57,9 @@ const App = () => {
         <Stack.Screen name="Upload" component={Upload} />
         <Stack.Screen name="LostItemUploadScreen" component={LostItemUploadScreen} />
         <Stack.Screen name="FoundItemUploadScreen" component={FoundItemUploadScreen} />
-        
+        <Stack.Screen name="TransactionPage" component={TransactionPage} />
+        <Stack.Screen name="ClaimDetailsScreen" component={ClaimDetailsScreen} />
+
       </Stack.Navigator>
     </NavigationContainer>
   );

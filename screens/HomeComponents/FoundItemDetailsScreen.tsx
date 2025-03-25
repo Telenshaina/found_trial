@@ -7,7 +7,7 @@ import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../../supabase';
 
 const FoundItemDetailsScreen = ({ route }: { route: any }) => {
-  const { item } = route.params;
+  const { item} = route.params;
   const navigation = useNavigation();
   
   const [foundByUser, setFoundByUser] = useState<string | null>(null);
@@ -93,12 +93,13 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
 
   // Function to submit proof
   const handleSubmitProof = async () => {
-    let newErrors = { name: "", email: "", phone: "", identifyingInfo: "" };
+    let newErrors = { name: "", email: "", phone: "", identifyingInfo: "" ,pickupLocation: ""};
   
     if (!proofData.name) newErrors.name = "Full name is required";
     if (!proofData.email) newErrors.email = "Email is required";
     if (!proofData.phone) newErrors.phone = "Phone number is required";
     if (!proofData.identifyingInfo) newErrors.identifyingInfo = "Please provide proof details";
+    if (!proofData.pickupLocation) newErrors.pickupLocation = "Please provide location details";
   
     setErrors(newErrors);
     if (Object.values(newErrors).some((error) => error !== "")) return;
@@ -146,7 +147,9 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
           item_id: item.item_id,
           proof_url: proofUrl,
           description: proofData.identifyingInfo,
+          pickup_location: proofData.pickupLocation,
           status: 'pending',
+          
         },
       ]);
   

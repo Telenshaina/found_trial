@@ -8,10 +8,12 @@ export type RootStackParamList = {
   Login: undefined;
   Upload: undefined;
   Notification: undefined;
-  Chat: undefined;
+  Chat: { uploader_id: string; item_name: string };
   Account: undefined;
-  FoundItemDetails: { item: any };
+  FoundItemDetails: {item: any };
   LostItemDetails: { item: any };
+  TransactionPage: undefined;
+  ClaimDetailsScreen: {claim: any}
 
 
 };

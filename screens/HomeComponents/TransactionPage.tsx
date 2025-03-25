@@ -4,13 +4,14 @@ import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../navigation/types";
 import { supabase } from "../../supabase";
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from "@expo/vector-icons";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, "TransactionPage">;
 
 const TransactionPage: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
-  const [transactions, setTransactions] = useState<any[]>([]);
+  const [userClaims, setUserClaims] = useState<any[]>([]);
+  const [incomingClaims, setIncomingClaims] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const getStatusColor = (status: string) => {
@@ -35,42 +36,60 @@ const TransactionPage: React.FC = () => {
       return;
     }
 
-    const { data: claimsData, error } = await supabase
+    // Fetch user claims (transactions)
+    const { data: userClaimsData, error: userClaimsError } = await supabase
       .from("claims")
       .select("*")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
-    if (error) {
-      console.error("Error fetching claims:", error);
-      setLoading(false);
-      return;
-    }
-
-    const transactionsWithItemNames = await Promise.all(
-      (claimsData || []).map(async (claim) => {
+    // Add item names
+    const userClaimsWithNames = await Promise.all(
+      (userClaimsData || []).map(async (claim) => {
         const { data: itemData } = await supabase
           .from("found_items")
           .select("item_name")
           .eq("item_id", claim.item_id)
           .single();
-
-        return {
-          ...claim,
-          item_name: itemData?.item_name || "Unknown Item",
-        };
+        return { ...claim, item_name: itemData?.item_name || "Unknown Item" };
       })
     );
+    setUserClaims(userClaimsWithNames);
 
-    setTransactions(transactionsWithItemNames);
+    // Fetch incoming claims (claims on items uploaded by this user)
+    const { data: itemsUploadedRaw, error: uploadError } = await supabase
+            .from("found_items")
+            .select("item_id, item_name")
+            .eq("found_by", user.id);
+
+            if (uploadError) {
+            console.error("Error fetching uploaded items:", uploadError);
+            }
+
+            const itemsUploaded = itemsUploadedRaw ?? [];
+
+
+    const itemIds = itemsUploaded?.map((item) => item.item_id) || [];
+
+    if (itemIds.length > 0) {
+      const { data: incomingClaimsData } = await supabase
+        .from("claims")
+        .select("*")
+        .in("item_id", itemIds)
+        .order("created_at", { ascending: false });
+
+      const incomingClaimsWithNames = (incomingClaimsData || []).map((claim) => {
+        const item = itemsUploaded.find((item) => item.item_id === claim.item_id);
+        return { ...claim, item_name: item?.item_name || "Unknown Item" };
+      });
+
+      setIncomingClaims(incomingClaimsWithNames);
+    } else {
+      setIncomingClaims([]);
+    }
+
     setLoading(false);
   };
-
-  useFocusEffect(
-    React.useCallback(() => {
-      fetchTransactions();
-    }, [])
-  );
 
   const handleDelete = (claim_id: number) => {
     Alert.alert(
@@ -95,25 +114,31 @@ const TransactionPage: React.FC = () => {
     );
   };
 
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchTransactions();
+    }, [])
+  );
+
   return (
     <View style={styles.container}>
       <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
         <Text style={styles.backText}>← Back</Text>
       </TouchableOpacity>
-      <Text style={styles.title}>Your Transactions</Text>
+      <Text style={styles.title}>Your Claims</Text>
 
       {loading ? (
         <ActivityIndicator size="large" color="#007AFF" />
-      ) : transactions.length === 0 ? (
-        <Text style={styles.noTransactions}>No transactions found.</Text>
+      ) : userClaims.length === 0 ? (
+        <Text style={styles.noTransactions}>No claims found.</Text>
       ) : (
         <ScrollView>
-          {transactions.map((tx) => (
+          {userClaims.map((tx) => (
             <TouchableOpacity
               key={tx.claim_id}
               style={styles.transactionCard}
               onPress={() =>
-                navigation.navigate("ClaimDetailsScreen", { claim: tx })
+                navigation.navigate("ClaimDetailsScreen", { claim: tx, incoming: false })
               }
             >
               <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
@@ -130,6 +155,35 @@ const TransactionPage: React.FC = () => {
           ))}
         </ScrollView>
       )}
+
+      <Text style={[styles.title, { marginTop: 30 }]}>Incoming Claims (Other users claiming your items)</Text>
+
+      {loading ? (
+        <ActivityIndicator size="large" color="#007AFF" />
+      ) : incomingClaims.length === 0 ? (
+        <Text style={styles.noTransactions}>No incoming claims found.</Text>
+      ) : (
+        <ScrollView>
+          {incomingClaims.map((claim) => (
+            <TouchableOpacity
+              key={claim.claim_id}
+              style={styles.transactionCard}
+              onPress={() =>
+                navigation.navigate("ClaimDetailsScreen", { claim: claim, incoming: true })
+              }
+            >
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={styles.txTitle}>{claim.item_name}</Text>
+              </View>
+              <View style={[styles.statusTag, { backgroundColor: getStatusColor(claim.status) }]}>
+                <Text style={styles.statusText}>{claim.status.toUpperCase()}</Text>
+              </View>
+              <Text>Claimed by: {claim.user_id}</Text>
+              <Text>Date: {new Date(claim.created_at).toLocaleDateString()}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
     </View>
   );
 };
@@ -139,7 +193,7 @@ const styles = StyleSheet.create({
   backButton: { marginBottom: 20 },
   backText: { fontSize: 16, color: "#007AFF" },
   title: { fontSize: 24, fontWeight: "bold", marginBottom: 20 },
-  noTransactions: { textAlign: "center", fontSize: 16, color: "#888", marginTop: 30 },
+  noTransactions: { textAlign: "center", fontSize: 16, color: "#888", marginTop: 10 },
   transactionCard: {
     backgroundColor: "#f0f0f0",
     padding: 15,

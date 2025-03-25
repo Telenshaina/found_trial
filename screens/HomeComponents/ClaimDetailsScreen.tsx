@@ -5,15 +5,17 @@ import { RootStackParamList } from '../../navigation/types';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { supabase } from '../../supabase';
 
-type ClaimDetailsScreenRouteProp = RouteProp<RootStackParamList, 'ClaimDetailsScreen'>;
+
 type ClaimDetailsScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'ClaimDetailsScreen'>;
+
+type ClaimDetailsScreenRouteProp = RouteProp<RootStackParamList, 'ClaimDetailsScreen'>;
 
 type Props = {
   route: ClaimDetailsScreenRouteProp;
 };
 
 const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
-  const { claim } = route.params;
+  const { claim, incoming } = route.params;
   const navigation = useNavigation<ClaimDetailsScreenNavigationProp>();
 
   const handleDeleteClaim = async () => {
@@ -41,6 +43,22 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
       item_name: claim.item_name,
     });
   };
+
+  const handleStatusUpdate = async (status: 'approved' | 'rejected') => {
+    const { error } = await supabase
+      .from('claims')
+      .update({ status })
+      .eq('claim_id', claim.claim_id);
+  
+    if (error) {
+      Alert.alert('Error', `Failed to ${status} claim.`);
+    } else {
+      Alert.alert('Success', `Claim has been ${status}.`);
+      navigation.goBack();
+    }
+  };
+  
+
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -82,10 +100,30 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
         </TouchableOpacity>
       )}
 
+        {incoming && claim.status.toLowerCase() === 'pending' && (
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+            <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: '#4CAF50' }]}
+            onPress={() => handleStatusUpdate('approved')}
+            >
+            <Text style={styles.actionButtonText}>Approve</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: '#FF4C4C' }]}
+            onPress={() => handleStatusUpdate('rejected')}
+            >
+            <Text style={styles.actionButtonText}>Reject</Text>
+            </TouchableOpacity>
+        </View>
+        )}
+
+
       <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteClaim}>
         <Text style={styles.deleteButtonText}>Delete Claim</Text>
       </TouchableOpacity>
     </ScrollView>
+
+    
   );
 };
 
@@ -138,6 +176,18 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 16,
   },
+  actionButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    marginVertical: 10,
+  },
+  actionButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  
 });
 
 export default ClaimDetailsScreen;

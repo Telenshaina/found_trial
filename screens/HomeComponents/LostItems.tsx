@@ -8,10 +8,10 @@ import { StackNavigationProp } from "@react-navigation/stack";
 import { supabase } from "../../supabase";
 
 type RootStackParamList = {
-  ItemDetails: { item: any };
+  LostItemDetails: { item: any };
 };
 
-type NavigationProp = StackNavigationProp<RootStackParamList, "ItemDetails">;
+type NavigationProp = StackNavigationProp<RootStackParamList, "LostItemDetails">;
 
 const LostItems = () => {
   const [items, setItems] = useState<any[]>([]);
@@ -66,7 +66,7 @@ const LostItems = () => {
     try {
       await AsyncStorage.setItem("lastAccessed", JSON.stringify(item));
       console.log("Stored last accessed item:", item);
-      navigation.navigate("ItemDetails", { item });
+      navigation.navigate("LostItemDetails", { item });
     } catch (error) {
       console.error("Error saving last accessed item:", error);
     }

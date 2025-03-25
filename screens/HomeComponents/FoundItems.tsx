@@ -6,10 +6,10 @@ import { supabase } from '../../supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type RootStackParamList = {
-  ItemDetails: { item: any };
+  FoundItemDetails: { item: any };
 };
 
-type NavigationProp = StackNavigationProp<RootStackParamList, 'ItemDetails'>;
+type NavigationProp = StackNavigationProp<RootStackParamList, 'FoundItemDetails'>;
 
 interface FoundItemsProps {
   onItemsGrouped?: (groupedItems: Record<string, any[]>) => void; 
@@ -131,7 +131,7 @@ const FoundItems: React.FC<FoundItemsProps> = ({ onItemsGrouped }) => {
                   style={styles.card} 
                   onPress={() => {
                     logLastAccessedItem(item);
-                    navigation.navigate('ItemDetails', { item });
+                    navigation.navigate('FoundItemDetails', { item });
                   }}
                 >
                   <Image source={{ uri: item.image_url }} style={styles.image} />

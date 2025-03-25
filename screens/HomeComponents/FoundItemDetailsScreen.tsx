@@ -6,7 +6,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../../supabase';
 
-const ItemDetailsScreen = ({ route }: { route: any }) => {
+const FoundItemDetailsScreen = ({ route }: { route: any }) => {
   const { item } = route.params;
   const navigation = useNavigation();
 
@@ -224,7 +224,7 @@ const ItemDetailsScreen = ({ route }: { route: any }) => {
       <Modal visible={isProofModalVisible} animationType="slide" transparent>
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
-          <Text style={styles.modalTitle}>Submit Proof of Ownership</Text>
+          <Text style={styles.modalTitle}>Submit Found Proof</Text>
           <Text style={styles.modalDescription}>
             Please provide details to prove this item belongs to you. The owner will review your claim.
           </Text>
@@ -459,4 +459,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ItemDetailsScreen;
+export default FoundItemDetailsScreen;

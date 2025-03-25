@@ -5,12 +5,14 @@ import BottomTabNavigator from "./navigation/BottomTabNavigator";
 import Login from "./screens/Login";
 import Setup from "./screens/Setup";
 import SearchScreen from "./screens/HomeComponents/SearchScreen";
-import ItemDetailsScreen from "./screens/HomeComponents/ItemDetailsScreen";
+import FoundItemDetails from "./screens/HomeComponents/FoundItemDetailsScreen";
+import LostItemDetails from "./screens/HomeComponents/LostItemDetailsScreen";
 import Home from "./screens/Home";
 import Upload from "./screens/Upload";
 import LostItemUploadScreen from "./screens/HomeComponents/LostItemUploadScreen";
 import FoundItemUploadScreen from "./screens/HomeComponents/FoundItemUploadScreen";
 import AuthChecker from "./screens/AuthChecker"; 
+
 export type RootStackParamList = {
   AuthChecker: undefined; 
   Login: undefined;
@@ -18,7 +20,8 @@ export type RootStackParamList = {
   Setup: undefined;
   Home: undefined;
   SearchScreen: { query: string };
-  ItemDetails: { item: any };
+  FoundItemDetails: { item: any };
+  LostItemDetails: { item: any };
   Upload: undefined;
   LostItemUploadScreen: undefined;
   FoundItemUploadScreen: undefined;
@@ -36,9 +39,14 @@ const App = () => {
         <Stack.Screen name="Main" component={BottomTabNavigator} />
         <Stack.Screen name="SearchScreen" component={SearchScreen} />
         <Stack.Screen 
-          name="ItemDetails" 
-          component={ItemDetailsScreen} 
-          options={{ title: "Item Details", headerShown: true }} 
+          name="FoundItemDetails" 
+          component={FoundItemDetails} 
+          options={{ title: "Found Item Details", headerShown: true }} 
+        />
+        <Stack.Screen 
+          name="LostItemDetails" 
+          component={LostItemDetails} 
+          options={{ title: "Lost Item Details", headerShown: true }} 
         />
         <Stack.Screen name="Home" component={Home} />
         <Stack.Screen name="Upload" component={Upload} />

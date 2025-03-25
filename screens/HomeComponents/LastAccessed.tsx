@@ -15,7 +15,6 @@ const LastAccessed = () => {
       const savedItem = await AsyncStorage.getItem('lastAccessed');
       if (savedItem) {
         const parsedItem = JSON.parse(savedItem);
-        console.log('Fetched last accessed item:', parsedItem);
         setLastAccessed(parsedItem);
       }
 

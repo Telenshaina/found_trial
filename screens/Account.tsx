@@ -23,9 +23,10 @@ const Account: React.FC = () => {
     phoneNumber: string;
   } | null>(null);
 
-  // New state variables for editable fields
+  // New state variables for editable fields and user role
   const [studentId, setStudentId] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [role, setRole] = useState<string>("");
 
   // 🔹 Fetch user details from Supabase
   useEffect(() => {
@@ -41,6 +42,9 @@ const Account: React.FC = () => {
         // Extract email domain
         const emailDomain = user.email?.split("@")[1] || "";
         const table = emailDomain === "neu.edu.ph" ? "institutional_users" : "guest_users";
+  
+        // Set user role based on email domain
+        setRole(emailDomain === "neu.edu.ph" ? "STUDENT" : "GUEST");
   
         // Fetch user details from the appropriate table
         const { data: userDetails, error: userDetailsError } = await supabase
@@ -90,8 +94,6 @@ const Account: React.FC = () => {
       Alert.alert("Error", "Failed to update information");
     }
   };
-  
-  
 
   const handleLogout = async () => {
     try {
@@ -139,16 +141,14 @@ const Account: React.FC = () => {
       // Log the logout activity
       const { error: logError } = await supabase
         .from("user_logs")  
-        .insert([
-          {
-            user_id: userId, 
-            name: userName,
-            email: userEmail,
-            user_type: userType,  // ✅ Ensured user type is logged
-            activity_type: "logout",
-            timestamp: new Date().toISOString(),
-          },
-        ]);
+        .insert([{
+          user_id: userId, 
+          name: userName,
+          email: userEmail,
+          user_type: userType,  
+          activity_type: "logout",
+          timestamp: new Date().toISOString(),
+        }]);
   
       if (logError) {
         console.error("❌ Error logging logout:", logError.message);
@@ -166,10 +166,6 @@ const Account: React.FC = () => {
     }
   };
 
-  
-  
-  
-
   return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.accountTitle}>Account</Text>
@@ -182,32 +178,37 @@ const Account: React.FC = () => {
             <View style={styles.profileContainer}>
               <View style={styles.avatarPlaceholder} />
               <Text style={styles.name}>{userData.name}</Text>
-              <Text style={styles.role}>STUDENT</Text>
+              <Text style={styles.role}>{role}</Text> {/* Show STUDENT or GUEST */}
             </View>
 
             <View style={styles.infoContainer}>
               <Text style={styles.label}>EMAIL</Text>
               <TextInput style={styles.input} value={userData.email} editable={false} />
 
-              <Text style={styles.label}>STUDENT ID</Text>
-              <TextInput
-              style={styles.input}
-              value={userData.studentId}
-              onChangeText={(text) => setUserData({ ...userData, studentId: text })}
-              onSubmitEditing={() => updateUserData("student_id", userData.studentId)}
-              placeholder="Enter Student ID Here"
-              placeholderTextColor="#A9A9A9" // Gray ghost text
-              />
+              {/* Conditionally render STUDENT ID input if the user is a STUDENT */}
+              {role === "STUDENT" && (
+                <>
+                  <Text style={styles.label}>STUDENT ID</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={userData.studentId}
+                    onChangeText={(text) => setUserData({ ...userData, studentId: text })}
+                    onSubmitEditing={() => updateUserData("student_id", userData.studentId)}
+                    placeholder="Enter Student ID Here"
+                    placeholderTextColor="#A9A9A9" // Gray ghost text
+                  />
+                </>
+              )}
 
               <Text style={styles.label}>PHONE NUMBER</Text>
               <TextInput
-              style={styles.input}
-              value={userData.phoneNumber}
-              onChangeText={(text) => setUserData({ ...userData, phoneNumber: text })}
-              onSubmitEditing={() => updateUserData("phone_number", userData.phoneNumber)}
-              placeholder="Enter Phone Number Here"
-              placeholderTextColor="#A9A9A9" // Gray ghost text
-            />
+                style={styles.input}
+                value={userData.phoneNumber}
+                onChangeText={(text) => setUserData({ ...userData, phoneNumber: text })}
+                onSubmitEditing={() => updateUserData("phone_number", userData.phoneNumber)}
+                placeholder="Enter Phone Number Here"
+                placeholderTextColor="#A9A9A9" // Gray ghost text
+              />
             </View>
 
             <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>

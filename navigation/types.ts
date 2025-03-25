@@ -14,6 +14,7 @@ export type RootStackParamList = {
   LostItemDetails: { item: any };
   TransactionPage: undefined;
   ClaimDetailsScreen: {claim: any}
+  ChatScreen: { uploader_id: string; item_name: string };
 
 
 };

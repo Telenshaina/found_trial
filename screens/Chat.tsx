@@ -1,6 +1,9 @@
 import React from "react";
-import { View, Text, StyleSheet, FlatList, Image, SafeAreaView } from "react-native";
+import { View, Text, StyleSheet, FlatList, Image, SafeAreaView, TouchableOpacity } from "react-native";
 import Header from './Header';
+import { useRoute, useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { RootStackParamList } from "../navigation/types";
 
 const contacts = [
   {
@@ -35,29 +38,51 @@ const contacts = [
   },
 ];
 
+type ChatNavigationProp = NativeStackNavigationProp<RootStackParamList, "ChatScreen">;
+
 const Chat = () => {
+  const route = useRoute();
+  const navigation = useNavigation<ChatNavigationProp>();
+
+  // Check if user navigated with uploader_id and item_name
+  const params: any = route.params;
+  const uploaderContact = contacts.find((c) => c.id === params?.uploader_id);
+
+  const chatContacts = uploaderContact ? [uploaderContact] : contacts;
+
+  const handleContactPress = (contact: any) => {
+    navigation.navigate("ChatScreen", {
+      uploader_id: contact.id,
+      item_name: params?.item_name ?? "General",
+    });
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-    <Header />
-    <View style={styles.container}>
-      {/* Contacts List */}
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Contacts</Text>
-        <FlatList
-          data={contacts}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <View style={styles.contactItem}>
-              <Image source={item.image} style={styles.avatar} />
-              <View>
-                <Text style={styles.name}>{item.name}</Text>
-                <Text style={styles.email}>{item.email}</Text>
-              </View>
-            </View>
-          )}
-        />
+      <Header />
+      <View style={styles.container}>
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>
+            {uploaderContact ? `Chat with ${uploaderContact.name}` : "Contacts"}
+          </Text>
+          <FlatList
+            data={chatContacts}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.contactItem}
+                onPress={() => handleContactPress(item)}
+              >
+                <Image source={item.image} style={styles.avatar} />
+                <View>
+                  <Text style={styles.name}>{item.name}</Text>
+                  <Text style={styles.email}>{item.email}</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
       </View>
-    </View>
     </SafeAreaView>
   );
 };
@@ -67,20 +92,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#fff",
     padding: 16,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  logo: {
-    width: 40,
-    height: 40,
-    marginRight: 8,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: "bold",
   },
   card: {
     backgroundColor: "#fff",

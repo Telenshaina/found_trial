@@ -36,7 +36,7 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
   };
 
   const handleChatPress = () => {
-    navigation.navigate('Chat', {
+    navigation.navigate('ChatScreen', {
       uploader_id: claim.found_by, 
       item_name: claim.item_name,
     });

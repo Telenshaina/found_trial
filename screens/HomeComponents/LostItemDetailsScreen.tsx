@@ -71,62 +71,72 @@ const LostItemUploadScreen = ({ route }: { route: any }) => {
   };
 
   // Function to pick an image for proof submission
-  const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 1,
-    });
-
-    if (!result.canceled) {
-      setProofImage(result.assets[0].uri);
-    }
-  };
+ const handlePickImage = async () => {
+     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+     if (status !== 'granted') {
+       alert('Permission to access gallery is required!');
+       return;
+     }
+   
+     const result = await ImagePicker.launchImageLibraryAsync({
+       mediaTypes: ImagePicker.MediaTypeOptions.Images,
+       allowsEditing: true,
+       quality: 0.7,
+     });
+   
+     if (!result.canceled) {
+       setProofImage(result.assets[0].uri);
+     }
+   };
+  
 
   // Function to submit proof
-  const handleSubmitProof = async () => {
-    let newErrors = { name: "", email: "", phone: "", identifyingInfo: "" };
   
-    if (!proofData.name) newErrors.name = "Full name is required";
-    if (!proofData.email) newErrors.email = "Email is required";
-    if (!proofData.phone) newErrors.phone = "Phone number is required";
-    if (!proofData.identifyingInfo) newErrors.identifyingInfo = "Please provide proof details";
-  
-    setErrors(newErrors);
-    if (Object.values(newErrors).some((error) => error !== "")) return;
-  
-    setIsSubmitting(true);
-  
-    let proofUrl = null;
-  
-    //  Upload image only if an image is selected
-    if (proofImage) {
-      try {
-        const response = await fetch(proofImage);
-        const blob = await response.blob(); // Convert image to Blob
-        const fileName = `${authUserId}_${Date.now()}.jpg`;
-  
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('proofs')
-          .upload(fileName, blob, {
-            contentType: 'image/jpeg',
-          });
-  
-        if (uploadError) {
-          console.error('Error uploading image:', uploadError);
-          alert('Failed to upload proof image.');
-          setIsSubmitting(false);
-          return;
+    
+      // Function to submit proof
+      const handleSubmitProof = async () => {
+        let newErrors = { name: "", email: "", phone: "", identifyingInfo: "" };
+      
+        if (!proofData.name) newErrors.name = "Full name is required";
+        if (!proofData.email) newErrors.email = "Email is required";
+        if (!proofData.phone) newErrors.phone = "Phone number is required";
+        if (!proofData.identifyingInfo) newErrors.identifyingInfo = "Please provide proof details";
+      
+        setErrors(newErrors);
+        if (Object.values(newErrors).some((error) => error !== "")) return;
+      
+        setIsSubmitting(true);
+      
+        let proofUrl = null;
+      
+        //  Upload image only if an image is selected
+        if (proofImage) {
+          try {
+            const response = await fetch(proofImage);
+            const blob = await response.blob(); // Convert image to Blob
+            const fileName = `${authUserId}_${Date.now()}.jpg`;
+      
+            const { data: uploadData, error: uploadError } = await supabase.storage
+              .from('proofs')
+              .upload(fileName, blob, {
+                contentType: 'image/jpeg',
+              });
+      
+            if (uploadError) {
+              console.error('Error uploading image:', uploadError);
+              alert('Failed to upload proof image.');
+              setIsSubmitting(false);
+              return;
+            }
+      
+            proofUrl = supabase.storage.from('proofs').getPublicUrl(fileName).data.publicUrl;
+          } catch (error) {
+            console.error('Error converting image to Blob:', error);
+            alert('Failed to process proof image.');
+            setIsSubmitting(false);
+            return;
+          }
         }
-  
-        proofUrl = supabase.storage.from('proofs').getPublicUrl(fileName).data.publicUrl;
-      } catch (error) {
-        console.error('Error converting image to Blob:', error);
-        alert('Failed to process proof image.');
-        setIsSubmitting(false);
-        return;
-      }
-    }
   
     // Insert proof details into Supabase
     const { error } = await supabase
@@ -222,87 +232,96 @@ const LostItemUploadScreen = ({ route }: { route: any }) => {
 
       {/* Proof Submission Modal */}
       <Modal visible={isProofModalVisible} animationType="slide" transparent>
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContainer}>
-          <Text style={styles.modalTitle}>Submit Proof of Ownership</Text>
-          <Text style={styles.modalDescription}>
-            Please provide details to prove you have found this item.
-          </Text>
-
-          {/* Full Name Input */}
-          <TextInput
-            style={[styles.input, errors.name && styles.errorInput]}
-            placeholder="Your full name"
-            value={proofData.name}
-            onChangeText={(text) => setProofData({ ...proofData, name: text })}
-          />
-          {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
-
-          {/* Email Input */}
-          <TextInput
-            style={[styles.input, errors.email && styles.errorInput]}
-            placeholder="Your email"
-            keyboardType="email-address"
-            value={proofData.email}
-            onChangeText={(text) => setProofData({ ...proofData, email: text })}
-          />
-          {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
-
-          {/* Phone Input */}
-          <TextInput
-            style={[styles.input, errors.phone && styles.errorInput]}
-            placeholder="Your phone number"
-            keyboardType="phone-pad"
-            value={proofData.phone}
-            onChangeText={(text) => setProofData({ ...proofData, phone: text })}
-          />
-          {errors.phone && <Text style={styles.errorText}>{errors.phone}</Text>}
-
-          {/* Identifying Information Input */}
-          <TextInput
-            style={[styles.textarea, errors.identifyingInfo && styles.errorInput]}
-            placeholder="Provide details to prove this item belongs to you..."
-            multiline
-            value={proofData.identifyingInfo}
-            onChangeText={(text) => setProofData({ ...proofData, identifyingInfo: text })}
-          />
-          {errors.identifyingInfo && <Text style={styles.errorText}>{errors.identifyingInfo}</Text>}
-
-          {/* Pickup Location (Optional) */}
-          <TextInput
-            style={styles.input}
-            placeholder="Preferred pickup location (optional)"
-            value={proofData.pickupLocation}
-            onChangeText={(text) => setProofData({ ...proofData, pickupLocation: text })}
-          />
-
-          {/* Buttons */}
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity onPress={() => setProofModalVisible(false)} style={[styles.button, styles.cancelButton]}>
-              <Text style={styles.buttonText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={handleSubmitProof} style={styles.button}>
-              <Text style={styles.buttonText}>Submit Report</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-
-
-
-      {/* Check Status Modal */}
-      <Modal visible={isStatusModalVisible} animationType="fade" transparent>
-        <View style={styles.modalContainer}>
-          <View style={styles.statusModalContent}>
-            <Text style={styles.modalTitle}>Item Status</Text>
-            <Text style={styles.statusText}>Your uploaded item is currently being processed.</Text>
-            <Text style={styles.statusText}>No one has claimed the Item you have uploaded</Text>
-            <Text style={styles.infoText}>Check back later for updates.</Text>
-            <Button title="Close" onPress={() => setStatusModalVisible(false)} />
-          </View>
-        </View>
-      </Modal>
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContainer}>
+                <Text style={styles.modalTitle}>Submit Proof of Ownership</Text>
+                <Text style={styles.modalDescription}>
+                  Please provide details to prove this item belongs to you. The owner will review your claim.
+                </Text>
+      
+                {/* Full Name Input */}
+                <TextInput
+                  style={[styles.input, errors.name && styles.errorInput]}
+                  placeholder="Your full name"
+                  value={proofData.name}
+                  onChangeText={(text) => setProofData({ ...proofData, name: text })}
+                />
+                {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
+      
+                {/* Email Input */}
+                <TextInput
+                  style={[styles.input, errors.email && styles.errorInput]}
+                  placeholder="Your email"
+                  keyboardType="email-address"
+                  value={proofData.email}
+                  onChangeText={(text) => setProofData({ ...proofData, email: text })}
+                />
+                {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
+      
+                {/* Phone Input */}
+                <TextInput
+                  style={[styles.input, errors.phone && styles.errorInput]}
+                  placeholder="Your phone number"
+                  keyboardType="phone-pad"
+                  value={proofData.phone}
+                  onChangeText={(text) => setProofData({ ...proofData, phone: text })}
+                />
+                {errors.phone && <Text style={styles.errorText}>{errors.phone}</Text>}
+      
+                {/* Identifying Information Input */}
+                <TextInput
+                  style={[styles.textarea, errors.identifyingInfo && styles.errorInput]}
+                  placeholder="Provide details to prove this item belongs to you..."
+                  multiline
+                  value={proofData.identifyingInfo}
+                  onChangeText={(text) => setProofData({ ...proofData, identifyingInfo: text })}
+                />
+                {errors.identifyingInfo && <Text style={styles.errorText}>{errors.identifyingInfo}</Text>}
+      
+                {/* Pickup Location (Optional) */}
+                <TextInput
+                  style={styles.input}
+                  placeholder="Preferred pickup location (optional)"
+                  value={proofData.pickupLocation}
+                  onChangeText={(text) => setProofData({ ...proofData, pickupLocation: text })}
+                />
+                <TouchableOpacity onPress={handlePickImage} style={[styles.button, { marginVertical: 10 }]}>
+                    <Text style={styles.buttonText}>
+                      {proofImage ? 'Change Uploaded Image' : 'Optional: Upload Image'}
+                    </Text>
+                  </TouchableOpacity>
+      
+                  {proofImage && (
+                    <Image source={{ uri: proofImage }} style={{ width: '100%', height: 150, borderRadius: 8, marginBottom: 10 }} />
+                  )}
+      
+                {/* Buttons */}
+                <View style={styles.buttonContainer}>
+                  <TouchableOpacity onPress={() => setProofModalVisible(false)} style={[styles.button, styles.cancelButton]}>
+                    <Text style={styles.buttonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={handleSubmitProof} style={styles.button}>
+                    <Text style={styles.buttonText}>Submit Proof</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+      
+      
+      
+            {/* Check Status Modal */}
+            <Modal visible={isStatusModalVisible} animationType="fade" transparent>
+              <View style={styles.modalContainer}>
+                <View style={styles.statusModalContent}>
+                  <Text style={styles.modalTitle}>Item Status</Text>
+                  <Text style={styles.statusText}>Your uploaded item is currently being processed.</Text>
+                  <Text style={styles.statusText}>No one has claimed the Item you have uploaded</Text>
+                  <Text style={styles.infoText}>Check back later for updates.</Text>
+                  <Button title="Close" onPress={() => setStatusModalVisible(false)} />
+                </View>
+              </View>
+            </Modal>
     </View>
   );
 };

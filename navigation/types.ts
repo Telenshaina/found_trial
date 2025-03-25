@@ -10,7 +10,10 @@ export type RootStackParamList = {
   Notification: undefined;
   Chat: undefined;
   Account: undefined;
-  ItemDetails: { item: any }; 
+  FoundItemDetails: { item: any };
+  LostItemDetails: { item: any };
+
+
 };
 
 // Type for navigation prop

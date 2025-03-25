@@ -70,7 +70,7 @@ const FoundItems: React.FC<FoundItemsProps> = ({ onItemsGrouped }) => {
       setItems(itemsWithSource);
       
       setLoading(false);
-      console.log('Found items:', data);
+
 
     };
   
@@ -107,7 +107,10 @@ const FoundItems: React.FC<FoundItemsProps> = ({ onItemsGrouped }) => {
     }
 
     try {
-      await AsyncStorage.setItem('lastAccessed', JSON.stringify(item));
+      await AsyncStorage.setItem(
+        'lastAccessed',
+        JSON.stringify({ ...item, type: 'found' })
+      );
     } catch (storageError) {
       console.error('Error saving last accessed item to AsyncStorage:', storageError);
     }
@@ -130,9 +133,12 @@ const FoundItems: React.FC<FoundItemsProps> = ({ onItemsGrouped }) => {
                   key={index} 
                   style={styles.card} 
                   onPress={() => {
+                    console.log('Sending item:', item);
                     logLastAccessedItem(item);
                     navigation.navigate('FoundItemDetails', { item });
                   }}
+
+
                 >
                   <Image source={{ uri: item.image_url }} style={styles.image} />
                   <View style={styles.details}>

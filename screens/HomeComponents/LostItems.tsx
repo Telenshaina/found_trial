@@ -56,21 +56,25 @@ const LostItems = () => {
 
       setItems(itemsWithSource);
       setLoading(false);
-      console.log("Found items:", itemsWithSource);
+
     };
 
     fetchItems();
   }, []);
 
+  
+
   const handleItemClick = async (item: any) => {
     try {
-      await AsyncStorage.setItem("lastAccessed", JSON.stringify(item));
-      console.log("Stored last accessed item:", item);
-      navigation.navigate("LostItemDetails", { item });
+      const itemWithType = { ...item, type: 'lost' }; // Add type field
+      await AsyncStorage.setItem('lastAccessed', JSON.stringify(itemWithType));
+      console.log("Stored last accessed item:", itemWithType);
+      navigation.navigate("LostItemDetails", { item: itemWithType }); // Pass along the modified item
     } catch (error) {
       console.error("Error saving last accessed item:", error);
     }
   };
+  
 
   return (
     <View style={styles.section}>

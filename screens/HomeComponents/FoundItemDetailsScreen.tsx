@@ -9,7 +9,7 @@ import { supabase } from '../../supabase';
 const FoundItemDetailsScreen = ({ route }: { route: any }) => {
   const { item } = route.params;
   const navigation = useNavigation();
-
+  
   const [foundByUser, setFoundByUser] = useState<string | null>(null);
   const [authUserId, setAuthUserId] = useState<string | null>(null);
   const [isProofModalVisible, setProofModalVisible] = useState(false);
@@ -71,17 +71,25 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
   };
 
   // Function to pick an image for proof submission
-  const pickImage = async () => {
+  const handlePickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      alert('Permission to access gallery is required!');
+      return;
+    }
+  
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
-      quality: 1,
+      quality: 0.7,
     });
-
+  
     if (!result.canceled) {
       setProofImage(result.assets[0].uri);
     }
   };
+ 
+
 
   // Function to submit proof
   const handleSubmitProof = async () => {
@@ -127,14 +135,15 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
         return;
       }
     }
-  
+    
+    
     // Insert proof details into Supabase
     const { error } = await supabase
       .from('claims')
       .insert([
         {
           user_id: authUserId,
-          item_id: item.id,
+          item_id: item.item_id,
           proof_url: proofUrl,
           description: proofData.identifyingInfo,
           status: 'pending',
@@ -224,7 +233,7 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
       <Modal visible={isProofModalVisible} animationType="slide" transparent>
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
-          <Text style={styles.modalTitle}>Submit Found Proof</Text>
+          <Text style={styles.modalTitle}>Submit Proof of Ownership</Text>
           <Text style={styles.modalDescription}>
             Please provide details to prove this item belongs to you. The owner will review your claim.
           </Text>
@@ -275,6 +284,15 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
             value={proofData.pickupLocation}
             onChangeText={(text) => setProofData({ ...proofData, pickupLocation: text })}
           />
+          <TouchableOpacity onPress={handlePickImage} style={[styles.button, { marginVertical: 10 }]}>
+              <Text style={styles.buttonText}>
+                {proofImage ? 'Change Uploaded Image' : 'Optional: Upload Image'}
+              </Text>
+            </TouchableOpacity>
+
+            {proofImage && (
+              <Image source={{ uri: proofImage }} style={{ width: '100%', height: 150, borderRadius: 8, marginBottom: 10 }} />
+            )}
 
           {/* Buttons */}
           <View style={styles.buttonContainer}>

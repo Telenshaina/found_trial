@@ -11,7 +11,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 type RootStackParamList = {
   ItemDetails: { item: any };
 };
-type NavigationProp = StackNavigationProp<RootStackParamList, 'ItemDetails'>;
+
 const SearchScreen: React.FC = () => {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList, 'ItemDetails'>>();
   const route = useRoute();
@@ -22,25 +22,44 @@ const SearchScreen: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    console.log("🔍 Search query:", query);
-
     const fetchItems = async () => {
       setLoading(true);
+      setErrorMessage(null);
+    
       try {
-        const { data, error } = await supabase.from('lost_items').select('*');
+        console.log("🔍 Fetching items related to:", query);
+    
+        // fetched data from 3 tables (found items, admin items, and lost items)
+        const { data: foundItems, error: foundItemsError } = await supabase.from('found_items').select('*');
+        const { data: adminItems, error: adminItemsError } = await supabase.from('found_items_by_admins').select('*');
+        const { data: lostItems, error: lostItemsError } = await supabase.from('lost_items').select('*');
 
-        if (error) throw error;
+        if (foundItemsError || adminItemsError || lostItemsError) {
+          throw new Error("Error fetching items from database.");
+        }
+    
+        // combine to singlelist
+        const allItems = [...(foundItems || []), ...(adminItems || []), ...(lostItems || [])];
 
-        const filteredResults = data.filter(item =>
-          item.category.toLowerCase().includes(query.toLowerCase()) ||
-          item.item_name.toLowerCase().includes(query.toLowerCase()) ||
-          (Array.isArray(item.tags) && item.tags.some((tag: string) => tag.toLowerCase().includes(query.toLowerCase())))
+        // removes duplicates based on item name, category, and date (date_found or date_lost)
+        const uniqueItems = Array.from(
+          new Map(allItems.map(item => [
+            `${item.item_name}-${item.category}-${item.date_found || item.date_lost}`, 
+            item
+          ])).values()
         );
 
-        console.log("✅ Fetched items:", filteredResults);
+        // Filter the results based on the search query
+        const filteredResults = uniqueItems.filter(item =>
+          item.category?.toLowerCase().includes(query.toLowerCase()) ||
+          item.item_name?.toLowerCase().includes(query.toLowerCase()) ||
+          (Array.isArray(item.tags) && item.tags.some((tag: string) => tag.toLowerCase().includes(query.toLowerCase())))
+        );
+    
         setSearchResults(filteredResults);
       } catch (error) {
-        console.error("❌ Error fetching items:", error);
+        console.error("❌ Fetch error:", error);
+        setErrorMessage("Failed to retrieve search results.");
       } finally {
         setLoading(false);
       }
@@ -76,7 +95,9 @@ const SearchScreen: React.FC = () => {
               <View style={styles.details}>
                 <Text style={styles.resultTitle}>{item.item_name}</Text>
                 <Text style={styles.resultCategory}>{item.category}</Text>
-                <Text style={styles.date}>{new Date(item.date_found).toLocaleDateString()}</Text>
+                <Text style={styles.date}>
+                  {new Date(item.date_found || item.date_lost).toLocaleDateString()}
+                </Text>
               </View>
             </TouchableOpacity>
           )}

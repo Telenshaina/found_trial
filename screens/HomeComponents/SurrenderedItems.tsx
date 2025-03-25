@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, ScrollView, StyleSheet, Image, ActivityIndicator, TouchableOpacity } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase } from "../../supabase";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
@@ -57,25 +58,35 @@ const SurrenderedItems = () => {
     fetchSurrenderedItems();
   }, []);
 
+  const handleItemPress = async (item: any) => {
+    try {
+      await AsyncStorage.setItem("lastAccessed", JSON.stringify(item));
+      navigation.navigate("ItemDetails", { item });
+    } catch (error) {
+      console.error("Error saving last accessed item:", error);
+    }
+  };
+
   return (
-    <View style={styles.container}>
+    <View style={styles.section}>
       <Text style={styles.title}>Surrendered Items</Text>
       {loading ? (
         <ActivityIndicator size="large" color="#000" />
       ) : items.length === 0 ? (
         <Text style={styles.noItemsText}>No surrendered items from Admins yet.</Text>
       ) : (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollView}>
           {items.map((item, index) => (
             <TouchableOpacity
               key={index}
-              style={styles.item}
-              onPress={() => navigation.navigate("ItemDetails", { item })}
+              style={styles.card}
+              onPress={() => handleItemPress(item)}
             >
               <Image source={{ uri: item.image_url }} style={styles.image} />
-              <Text style={styles.itemTitle}>{item.item_name}</Text>
-              <Text style={styles.date}>{new Date(item.date_found).toLocaleDateString()}</Text>
-              
+              <View style={styles.details}>
+                <Text style={styles.itemTitle}>{item.item_name}</Text>
+                <Text style={styles.date}>{new Date(item.date_found).toLocaleDateString()}</Text>
+              </View>
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -85,22 +96,28 @@ const SurrenderedItems = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { marginBottom: 20 },
-  title: { fontSize: 18, fontWeight: "600", marginBottom: 16 },
-  item: { alignItems: "center", marginRight: 12, width: 140 },
-  image: { width: 120, height: 120, backgroundColor: "#ddd", borderRadius: 8 },
-  itemTitle: { marginTop: 4, fontSize: 12, fontWeight: "500", textAlign: "center" },
-  date: { fontSize: 10, color: "#666" },
-  roleTag: {
-    fontSize: 10,
-    color: "#fff",
-    backgroundColor: "#3B82F6",
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-    borderRadius: 4,
-    marginTop: 2,
+  section: { marginBottom: 20 },
+  title: { fontSize: 18, fontWeight: "600", marginBottom: 12 },
+  scrollView: { flexDirection: "row" },
+  card: {
+    width: 180,
+    marginRight: 16,
+    borderRadius: 8,
+    overflow: "hidden",
+    backgroundColor: "#E6F4EA",
+    borderWidth: 2,
+    borderColor: "#2E7D32",
+    elevation: 3,
+    shadowColor: "#2E7D32",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
-  noItemsText: { fontSize: 14, color: "#777", textAlign: "center" },
+  image: { width: "100%", height: 120, backgroundColor: "#f1f5f9" },
+  details: { padding: 8 },
+  itemTitle: { fontSize: 14, fontWeight: "500" },
+  date: { fontSize: 12, color: "#666" },
+  noItemsText: { fontSize: 16, color: "#666", textAlign: "center", marginTop: 20 },
 });
 
 export default SurrenderedItems;

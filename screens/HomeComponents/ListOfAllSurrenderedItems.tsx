@@ -1,21 +1,19 @@
 import React, { useEffect, useState } from "react";
 import { 
-  View, Text, ScrollView, StyleSheet, Image, ActivityIndicator, 
+  View, Text, FlatList, StyleSheet, Image, ActivityIndicator, 
   TouchableOpacity 
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { supabase } from "../../supabase";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
+import { supabase } from "../../supabase";
 
 type RootStackParamList = {
   FoundItemDetails: { item: any };
-  ListOfAllSurrenderedItems: undefined;
 };
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'FoundItemDetails'>;
 
-const SurrenderedItems = () => {
+const ListOfAllSurrenderedItems: React.FC = () => {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const navigation = useNavigation<NavigationProp>();
@@ -34,7 +32,10 @@ const SurrenderedItems = () => {
         return;
       }
 
+      // get the IDs of users who posted the found items
       const foundByIds = foundItems.map((item) => item.found_by).filter(id => id);
+
+      // fetch institutional users (admins and superAdmins)
       const { data: institutionalUsers, error: institutionalError } = await supabase
         .from("institutional_users")
         .select("id, role")
@@ -46,9 +47,11 @@ const SurrenderedItems = () => {
         return;
       }
 
+      // filter posted from admin and superadmin
       const surrenderedItems = foundItems
         .map(item => {
           const poster = institutionalUsers?.find(user => user.id === item.found_by);
+          // check if admin/superadmin (poster)
           return poster && (poster.role === "admin" || poster.role === "superAdmin")
             ? { ...item, role: poster.role }
             : null;
@@ -62,79 +65,76 @@ const SurrenderedItems = () => {
     fetchSurrenderedItems();
   }, []);
 
-  const logLastAccessedItem = async (item: any) => {
-    try {
-      const itemWithType = { ...item, type: 'found' };
-      await AsyncStorage.setItem('lastAccessed', JSON.stringify(itemWithType)); 
-      navigation.navigate('FoundItemDetails', { item: itemWithType }); 
-    } catch (error) {
-      console.error('Error logging last accessed item:', error);
-    }
-  };
+  const renderItem = ({ item }: { item: any }) => (
+    <TouchableOpacity
+      style={styles.card}
+      onPress={() => navigation.navigate("FoundItemDetails", { item })}
+    >
+      {item.image_url ? (
+        <Image source={{ uri: item.image_url }} style={styles.image} />
+      ) : (
+        <View style={styles.imagePlaceholder}>
+          <Text style={styles.placeholderText}>No Image</Text>
+        </View>
+      )}
+      <View style={styles.details}>
+        <Text style={styles.itemTitle}>{item.item_name}</Text>
+        <Text style={styles.date}>{new Date(item.date_found).toLocaleDateString()}</Text>
+      </View>
+    </TouchableOpacity>
+  );
 
   return (
-    <View style={styles.section}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Surrendered Items</Text>
-        {items.length >= 6 && (
-          <TouchableOpacity 
-            onPress={() => navigation.navigate("ListOfAllSurrenderedItems")}
-          >
-            <Text style={styles.seeMoreText}>See More</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
+    <View style={styles.container}>
+      <Text style={styles.title}>All Surrendered Items</Text>
       {loading ? (
         <ActivityIndicator size="large" color="#000" />
       ) : items.length === 0 ? (
         <Text style={styles.noItemsText}>No surrendered items from Admins yet.</Text>
       ) : (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollView}>
-          {items.slice(0, 6).map((item, index) => (
-            <TouchableOpacity
-              key={index}
-              style={styles.card}
-              onPress={() => logLastAccessedItem(item)} // call the new function
-            >
-              <Image source={{ uri: item.image_url }} style={styles.image} />
-              <View style={styles.details}>
-                <Text style={styles.itemTitle}>{item.item_name}</Text>
-                <Text style={styles.date}>{new Date(item.date_found).toLocaleDateString()}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        <FlatList
+          data={items}
+          renderItem={renderItem}
+          keyExtractor={(item, index) => index.toString()}
+          numColumns={2}  // Display items in 2 columns
+          contentContainerStyle={styles.list}
+          scrollEnabled
+        />
       )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  section: { marginBottom: 20 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  title: { fontSize: 18, fontWeight: "600" },
-  scrollView: { flexDirection: "row" },
+  container: { flex: 1, padding: 16, backgroundColor: "#fff" },
+  title: { fontSize: 18, fontWeight: "600", marginBottom: 12 },
+  noItemsText: { fontSize: 16, color: "#666", textAlign: "center", marginTop: 20 },
+  list: { flexGrow: 1, justifyContent: "center" },
   card: {
-    width: 180,
-    marginRight: 16,
+    flex: 1,  
+    margin: 8,  
     borderRadius: 8,
     overflow: "hidden",
-    backgroundColor: "#E6F4EA",
-    borderWidth: 2,
-    borderColor: "#2E7D32",
+    backgroundColor: "#fff",
     elevation: 3,
-    shadowColor: "#2E7D32",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.2,
     shadowRadius: 4,
+    padding: 10,
   },
-  image: { width: "100%", height: 120, backgroundColor: "#f1f5f9" },
+  image: { width: "100%", height: 120, backgroundColor: "#f1f5f9", borderRadius: 8 },
+  imagePlaceholder: { 
+    width: "100%", 
+    height: 120, 
+    justifyContent: "center", 
+    alignItems: "center", 
+    backgroundColor: "#ddd" 
+  },
+  placeholderText: { fontSize: 14, color: "#555" },
   details: { padding: 8 },
   itemTitle: { fontSize: 14, fontWeight: "500" },
   date: { fontSize: 12, color: "#666" },
-  noItemsText: { fontSize: 16, color: "#666", textAlign: "center", marginTop: 20 },
-  seeMoreText: { fontSize: 10, fontWeight: "bold", color: "#2E7D32" },
 });
 
-export default SurrenderedItems;
+export default ListOfAllSurrenderedItems;

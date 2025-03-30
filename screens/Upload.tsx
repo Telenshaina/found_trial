@@ -1,42 +1,74 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, StyleSheet } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { RootStackParamList } from '../App';
+import React, { useState } from 'react';
+import { SafeAreaView, StyleSheet, useWindowDimensions } from 'react-native';
+import { TabView, TabBar } from 'react-native-tab-view';
 import Header from './Header';
-
-// Define the navigation prop type
-type UploadScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Upload'>;
+import LostItemForm from './HomeComponents/LostItemUploadScreen';
+import FoundItemForm from './HomeComponents/FoundItemUploadScreen';
 
 const Upload = () => {
-  const navigation = useNavigation<UploadScreenNavigationProp>();
+  const layout = useWindowDimensions();
+  const [index, setIndex] = useState(0);
+  const [routes] = useState([
+    { key: 'missing', title: 'Report Lost Item' },
+    { key: 'found', title: 'Report Found Item' },
+  ]);
+
+  const renderScene = ({ route }: { route: { key: string } }) => {
+    switch (route.key) {
+      case 'missing':
+        return <LostItemForm />;
+      case 'found':
+        return <FoundItemForm />;
+      default:
+        return null;
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       <Header />
-      <ScrollView contentContainerStyle={styles.contentContainer}>
-        <Text style={styles.title}>Select an Option</Text>
-        
-        <View style={styles.buttonWrapper}>
-          <Text style={styles.infoText}>Looking for your item?</Text>
-          <TouchableOpacity 
-            style={[styles.button, styles.primaryButton]} 
-            onPress={() => navigation.navigate('LostItemUploadScreen')}>
-            <Text style={styles.primaryButtonText}>Upload Lost Item</Text>
-          </TouchableOpacity>
-        </View>
-        
-        <View style={styles.buttonWrapper}>
-          <Text style={styles.infoText}>Found someone else's belonging?</Text>
-          <TouchableOpacity 
-            style={[styles.button, styles.primaryButton]} 
-            onPress={() => navigation.navigate('FoundItemUploadScreen')}>
-            <Text style={styles.primaryButtonText}>Upload Found Item</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+      <TabView
+        navigationState={{ index, routes }}
+        renderScene={renderScene}
+        onIndexChange={setIndex}
+        initialLayout={{ width: layout.width }}
+        renderTabBar={(props) => (
+          <TabBar
+            {...props}
+            indicatorStyle={{ backgroundColor: 'black' }}
+            style={{ backgroundColor: 'white' }}
+            activeColor="black"
+            inactiveColor="gray"
+          />
+        )}
+      />
     </SafeAreaView>
   );
+};
+
+const pickerSelectStyles = {
+  inputIOS: {
+    fontSize: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    borderWidth: 1.5,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    color: 'black',
+    paddingRight: 30,
+    backgroundColor: '#fff',
+  },
+  inputAndroid: {
+    fontSize: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    borderWidth: 1.5,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    color: 'black',
+    paddingRight: 30,
+    backgroundColor: '#fff',
+  },
 };
 
 const styles = StyleSheet.create({
@@ -44,35 +76,82 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
-  contentContainer: {
-    padding: 20,
-    alignItems: 'center',
+  main: {
+    flex: 1,
+  },
+  form: {
+    padding: 16,
+    gap: 24,
+  },
+  formGroup: {
+    gap: 8,
   },
   title: {
-    fontSize: 20,
+    fontSize: 25,
     fontWeight: 'bold',
-    marginBottom: 24,
     textAlign: 'center',
+    marginTop: 15,
   },
-  buttonWrapper: {
-    width: '100%',
-    marginBottom: 24,
-    alignItems: 'center',
+  subtitle: {
+    fontSize: 15, 
+    fontWeight: 'normal', 
+    fontStyle: 'italic', 
+    marginBottom: 16, 
+    textAlign: 'center',
+    color: '#666',
   },
-  infoText: {
+  label: {
     fontSize: 14,
-    marginBottom: 8,
-    textAlign: 'center',
-    fontWeight: 'bold',
+    color: 'black',
+    textTransform: 'uppercase',
+  },
+  input: {
+    borderWidth: 1.5,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    height: 50,
+    backgroundColor: '#fff',
+  },
+  textarea: {
+    height: 120,
+    textAlignVertical: 'top',
+  },
+  select: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    borderRadius: 8,
+    padding: 12,
+  },
+  selectText: {
+    fontSize: 16,
     color: '#666',
   },
   button: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 14,
+    padding: 12,
     borderRadius: 8,
-    width: '90%',
+    gap: 8,
+  },
+  buttonGroup: {
+    flexDirection: 'row', 
+    gap: 16, 
+    justifyContent: 'center',
+  },
+  outlineButton: {
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+  },
+  outlineButtonText: {
+    fontSize: 16,
+    color: '#000',
   },
   primaryButton: {
     backgroundColor: '#000',
@@ -81,6 +160,35 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#fff',
     fontWeight: '500',
+  },
+  tagContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    padding: 8,
+    borderWidth: 1.5,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    backgroundColor: '#fff',
+  },
+  tag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#000',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  tagText: {
+    color: '#fff',
+    fontSize: 14,
+    marginRight: 6,
+  },
+  tagInput: {
+    flex: 1,
+    fontSize: 16,
+    padding: 8,
+    minWidth: 100,
   },
 });
 

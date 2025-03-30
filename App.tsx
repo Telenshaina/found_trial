@@ -15,6 +15,11 @@ import TransactionPage from "./screens/HomeComponents/TransactionPage";
 import ClaimDetailsScreen from "./screens/HomeComponents/ClaimDetailsScreen";
 import ChatScreen from "./screens/HomeComponents/ChatScreen";
 import AuthChecker from "./screens/AuthChecker"; 
+import ListOfFoundItems from "./screens/HomeComponents/ListOfFoundItems"; 
+import ListOfLostItems from "./screens/HomeComponents/ListOfLostItems";
+import ListOfCategorizedItems from "./screens/HomeComponents/ListOfCategorizedItems";
+import ListOfAllSurrenderedItems from "./screens/HomeComponents/ListOfAllSurrenderedItems"; 
+
 
 export type RootStackParamList = {
   AuthChecker: undefined; 
@@ -30,6 +35,10 @@ export type RootStackParamList = {
   FoundItemUploadScreen: undefined;
   TransactionPage: undefined;
   ClaimDetailsScreen: { claim: any; incoming: boolean };
+  ListOfFoundItems: undefined;
+  ListOfLostItems: undefined;
+  ListOfCategorizedItems: { title: string }; 
+  ListOfAllSurrenderedItems: undefined; 
 
   ChatScreen: { uploader_id: string; item_name: string };
 
@@ -66,6 +75,26 @@ const App = () => {
           name="ChatScreen"
           component={ChatScreen}
           options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="ListOfFoundItems" 
+          component={ListOfFoundItems} 
+          options={{ title: "All Found Items", headerShown: true }} 
+        />
+        <Stack.Screen 
+          name="ListOfLostItems" 
+          component={ListOfLostItems} 
+          options={{ title: "All Lost Items", headerShown: true }} 
+        />
+        <Stack.Screen 
+          name="ListOfCategorizedItems" 
+          component={ListOfCategorizedItems} 
+          options={{ title: "Categorized Items", headerShown: true }} 
+        />
+        <Stack.Screen 
+          name="ListOfAllSurrenderedItems" // ✅ Add the screen to the navigator
+          component={ListOfAllSurrenderedItems} 
+          options={{ title: "All Surrendered Items", headerShown: true }} 
         />
 
 

@@ -14,6 +14,8 @@ export type RootStackParamList = {
   LostItemDetails: { item: any };
   TransactionPage: undefined;
   ClaimDetailsScreen: { claim: any; incoming: boolean };
+  ListOfCategorizedItems: { title: string };
+  
 
   ChatScreen: { uploader_id: string; item_name: string };
 

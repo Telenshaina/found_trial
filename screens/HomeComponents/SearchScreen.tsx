@@ -1,19 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  View, Text, FlatList, StyleSheet, Image, 
-  TouchableOpacity, ActivityIndicator 
-} from 'react-native';
+import { View, Text, FlatList, StyleSheet, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { supabase } from '../../supabase';
 import { Feather } from '@expo/vector-icons';
 import { StackNavigationProp } from '@react-navigation/stack';
 
 type RootStackParamList = {
-  ItemDetails: { item: any };
+  FoundItemDetails: { item: any };
+  LostItemDetails: { item: any };
 };
 
 const SearchScreen: React.FC = () => {
-  const navigation = useNavigation<StackNavigationProp<RootStackParamList, 'ItemDetails'>>();
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const route = useRoute();
   const { query } = route.params as { query: string };
 
@@ -25,10 +23,10 @@ const SearchScreen: React.FC = () => {
     const fetchItems = async () => {
       setLoading(true);
       setErrorMessage(null);
-    
+
       try {
         console.log("🔍 Fetching items related to:", query);
-    
+
         // fetched data from 3 tables (found items, admin items, and lost items)
         const { data: foundItems, error: foundItemsError } = await supabase.from('found_items').select('*');
         const { data: adminItems, error: adminItemsError } = await supabase.from('found_items_by_admins').select('*');
@@ -37,7 +35,7 @@ const SearchScreen: React.FC = () => {
         if (foundItemsError || adminItemsError || lostItemsError) {
           throw new Error("Error fetching items from database.");
         }
-    
+
         // combine to singlelist
         const allItems = [...(foundItems || []), ...(adminItems || []), ...(lostItems || [])];
 
@@ -55,7 +53,7 @@ const SearchScreen: React.FC = () => {
           item.item_name?.toLowerCase().includes(query.toLowerCase()) ||
           (Array.isArray(item.tags) && item.tags.some((tag: string) => tag.toLowerCase().includes(query.toLowerCase())))
         );
-    
+
         setSearchResults(filteredResults);
       } catch (error) {
         console.error("❌ Fetch error:", error);
@@ -67,6 +65,15 @@ const SearchScreen: React.FC = () => {
 
     fetchItems();
   }, [query]);
+
+  const handleItemPress = (item: any) => {
+    // Check whether the item is found or lost and navigate accordingly
+    if (item.date_found) {
+      navigation.navigate('FoundItemDetails', { item });
+    } else {
+      navigation.navigate('LostItemDetails', { item });
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -89,7 +96,7 @@ const SearchScreen: React.FC = () => {
           renderItem={({ item }) => (
             <TouchableOpacity 
               style={styles.resultItem} 
-              onPress={() => navigation.navigate('ItemDetails', { item })}
+              onPress={() => handleItemPress(item)} // handle navigation based on item type (lost or found)
             >
               <Image source={{ uri: item.image_url }} style={styles.image} />
               <View style={styles.details}>

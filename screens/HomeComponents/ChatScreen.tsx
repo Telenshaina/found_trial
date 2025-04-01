@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef  } from "react";
 import {
   View,
   Text,
@@ -57,79 +57,84 @@ useEffect(() => {
 
   // ✅ Fetch messages from Supabase
   useEffect(() => {
+    if (!claim_id) return;
+  
     const fetchMessages = async () => {
       const { data, error } = await supabase
         .from("chats")
         .select("*")
-        .eq("claim_id", claim_id) // ✅ Ensure claim_id is used
+        .eq("claim_id", claim_id)
         .order("created_at", { ascending: true });
-
+  
       if (error) {
         console.error("Error fetching messages:", error.message);
       } else {
         setMessages(data);
       }
     };
-
+  
     fetchMessages();
-
-    // ✅ Real-time subscription for new messages
+  
+    // Real-time subscription for new messages
     const subscription = supabase
       .channel(`chats:claim_id=${claim_id}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "chats", filter: `claim_id=eq.${claim_id}` },
-        (payload) => {
-          setMessages((prev) => [...prev, payload.new]);
-        }
-      )
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chats", filter: `claim_id=eq.${claim_id}` }, (payload) => {
+        // Ensure we don't duplicate the message based on 'created_at' timestamp
+        setMessages((prevMessages) => {
+          const isDuplicate = prevMessages.some((msg) => msg.created_at === payload.new.created_at);
+          if (!isDuplicate) {
+            return [...prevMessages, payload.new];
+          }
+          return prevMessages;
+        });
+      })
       .subscribe();
 
     return () => {
       supabase.removeChannel(subscription);
     };
   }, [claim_id]);
+  
 
   // ✅ Handle sending messages
   const handleSend = async () => {
-    if (inputText.trim() === "" || !userId) return; // Ensure userId is valid
+    if (inputText.trim() === "" || !userId) return;
   
-    let finalReceiverId = receiverId; // Default to uploader_id
+    let finalReceiverId = receiverId;
   
-    // ✅ Fetch `user_id` from the `claims` table if the current user is the uploader
     if (userId === receiverId) {
       const { data, error } = await supabase
         .from("claims")
         .select("user_id")
         .eq("claim_id", claim_id)
-        .single(); // Get only one record
+        .single();
   
       if (error) {
         console.error("Error fetching claim user_id:", error.message);
         return;
       }
   
-      finalReceiverId = data?.user_id ?? receiverId; // Use claim's user_id if available
+      finalReceiverId = data?.user_id ?? receiverId;
     }
   
     const newMessage = {
-      claim_id, 
-      sender_id: userId, 
-      receiver_id: finalReceiverId, 
-      message: inputText, 
+      claim_id,
+      sender_id: userId,
+      receiver_id: finalReceiverId,
+      message: inputText,
       created_at: new Date().toISOString(),
     };
   
-   
-    setMessages((prev) => [...prev, newMessage]);
-    setInputText("");
+    setInputText(""); // ✅ Clear input immediately
   
     const { error } = await supabase.from("chats").insert([newMessage]);
+  
     if (error) {
       console.error("Error sending message:", error.message);
-      setMessages((prev) => prev.filter((msg) => msg !== newMessage)); // Rollback if failed
+      Alert.alert("Failed to send message. Try again.");
     }
   };
+  
   
 
   useEffect(() => {
@@ -211,9 +216,35 @@ useEffect(() => {
       alert("Failed to approve claim. Try again.");
     }
   };
+
+  const flatListRef = useRef<FlatList<any>>(null);
+
+  useEffect(() => {
+    if (messages.length > 0) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100); // Small delay ensures UI update happens first
+    }
+  }, [messages]);
   
 
-  
+<FlatList
+  ref={flatListRef}
+  data={messages}
+  keyExtractor={(item) => item.chat_id?.toString() || item.created_at}
+  renderItem={({ item }) => (
+    <View
+      style={[
+        styles.messageBubble,
+        item.sender_id === userId ? styles.myMessage : styles.theirMessage,
+      ]}
+    >
+      <Text style={styles.messageText}>{item.message}</Text>
+    </View>
+  )}
+  contentContainerStyle={{ paddingVertical: 20 }}
+/>;
+
 
   return (
     <View style={styles.container}>

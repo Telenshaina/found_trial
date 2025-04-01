@@ -27,7 +27,8 @@ const TransactionScreen: React.FC<Props> = ({ route }) => {
   const [place, setPlace] = useState<string>('');
   const [modalVisible, setModalVisible] = useState(false);
   const [confirmationAction, setConfirmationAction] = useState<null | (() => void)>(null);
-
+  const [isReturnConfirmed, setIsReturnConfirmed] = useState(false); // New state to track return confirmation
+  const [isReceivedConfirmed, setIsReceivedConfirmed] = useState(false); 
 
   const isFinder = userId === claim.found_by;
   const isClaimer = userId === claim.user_id;
@@ -198,15 +199,54 @@ const TransactionScreen: React.FC<Props> = ({ route }) => {
   // Handle confirm return for Finder
   const handleConfirmReturn = () => {
     if (!proof) return;
-    setConfirmationAction(() => confirmReturn);
+    setConfirmationAction(() => async () => {
+      await confirmReturn();
+      setIsReturnConfirmed(true);  // Disable the Confirm Return button after confirmation
+      setModalVisible(false);
+    });
     setModalVisible(true);
   };
   
+  // Handle confirm received for Claimer
   const handleConfirmReceived = () => {
     if (!proof) return;
-    setConfirmationAction(() => confirmReceived);
+    setConfirmationAction(() => async () => {
+      await confirmReceived();
+      setIsReceivedConfirmed(true);  // Disable the Confirm Received button after confirmation
+      setModalVisible(false);
+    });
     setModalVisible(true);
   };
+  
+  const checkAndUpdateItemStatus = async () => {
+    const { data, error } = await supabase
+      .from('claims')
+      .select('finder_confirmed, claimer_confirmed, item_id')
+      .eq('claim_id', claim.claim_id)
+      .single();
+  
+    if (error || !data) {
+      console.error('Error fetching claim data:', error);
+      return;
+    }
+  
+    if (data.finder_confirmed && data.claimer_confirmed) {
+      // Ensure found_item_id is available
+      const { error: updateError } = await supabase
+        .from('found_items')
+        .update({ status: 'Claimed' })
+        .eq('item_id', data.item_id);
+  
+      if (updateError) {
+        console.error('Error updating item status:', updateError.message);
+      } else {
+        console.log('Item status updated to "Claimed"');
+      }
+    }
+  };
+  
+  
+  // Call this function after confirming the return or the received status.
   const confirmReturn = async () => {
     try {
       const { error } = await supabase
@@ -216,7 +256,8 @@ const TransactionScreen: React.FC<Props> = ({ route }) => {
       
       if (error) throw error;
   
-      checkAndUpdateItemStatus();
+      // Check and update item status after the update
+      await checkAndUpdateItemStatus();
       Alert.alert('Success', 'Return confirmed.');
     } catch (error) {
       Alert.alert('Error', 'Failed to confirm return.');
@@ -229,28 +270,41 @@ const TransactionScreen: React.FC<Props> = ({ route }) => {
         .from('claims')
         .update({ claimer_confirmed: true })
         .eq('claim_id', claim.claim_id);
-      
+  
       if (error) throw error;
   
-      checkAndUpdateItemStatus();
+      // Check and update item status after the update
+      await checkAndUpdateItemStatus();
       Alert.alert('Success', 'Item received confirmed.');
     } catch (error) {
       Alert.alert('Error', 'Failed to confirm receipt.');
     }
   };
-  const checkAndUpdateItemStatus = async () => {
-    const { data, error } = await supabase
-      .from('claims')
-      .select('finder_confirmed, claimer_confirmed')
-      .eq('claim_id', claim.claim_id)
-      .single();
   
-    if (error || !data) return;
   
-    if (data.finder_confirmed && data.claimer_confirmed) {
-      await supabase.from('found_items').update({ status: 'claimed' }).eq('id', claim.found_item_id);
-    }
-  };
+  
+  
+  useEffect(() => {
+    const fetchConfirmationStatus = async () => {
+      const { data, error } = await supabase
+        .from('claims')
+        .select('finder_confirmed, claimer_confirmed')
+        .eq('claim_id', claim.claim_id)
+        .single();
+  
+      if (error) {
+        console.error('Error fetching confirmation status:', error.message);
+        return;
+      }
+  
+      if (data) {
+        setIsReturnConfirmed(data.finder_confirmed);
+        setIsReceivedConfirmed(data.claimer_confirmed);
+      }
+    };
+  
+    fetchConfirmationStatus();
+  }, [claim.claim_id]);
   
   
   return (
@@ -269,15 +323,18 @@ const TransactionScreen: React.FC<Props> = ({ route }) => {
           <Text>Date: {proof.date}</Text>
           <Text>Time: {proof.time}</Text>
           <Text>Place: {proof.place}</Text>
+
+          {isFinder && (
           <TouchableOpacity onPress={deleteProof} style={styles.button}>
             <Text style={styles.buttonText}>Delete Proof</Text>
           </TouchableOpacity>
+          )}
         </>
       ) : (
         <>
           <Text>No proof of return available yet.</Text>
           {/* Allow user to upload image or take photo */}
-          {(isFinder || isClaimer) && (
+          {isFinder  && (
             <>
               <TouchableOpacity onPress={pickImage} style={styles.button}>
                 <Text style={styles.buttonText}>Select Proof Image</Text>
@@ -315,45 +372,49 @@ const TransactionScreen: React.FC<Props> = ({ route }) => {
 
       {/* Confirm Return button for Finder */}
       {isFinder && (
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: proof ? '#4CAF50' : '#B0B0B0' }]}
-          onPress={handleConfirmReturn}
-          disabled={!proof}
-        >
-          <Text style={styles.buttonText}>Confirm Return</Text>
-        </TouchableOpacity>
-      )}
-        <Modal visible={modalVisible} transparent animationType="slide">
-  <View style={styles.modalContainer}>
-    <View style={styles.modalContent}>
-      <Text style={styles.modalText}>Are you sure you want to confirm?</Text>
-      <Text style={styles.modalText}>The item will be marked as Claimed</Text>
-      <View style={styles.modalButtons}>
-        <TouchableOpacity onPress={() => { 
-          confirmationAction?.(); 
-          setModalVisible(false); 
-        }} style={styles.button}>
-          <Text style={styles.buttonText}>Yes</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setModalVisible(false)} style={[styles.button, { backgroundColor: 'red' }]}>
-          <Text style={styles.buttonText}>Cancel</Text>
-        </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.button, {
+          backgroundColor: isReturnConfirmed || !proof ? '#B0B0B0' : '#28A745'  // Green when enabled, Light Gray when disabled
+        }]}
+        onPress={handleConfirmReturn}
+        disabled={!proof || isReturnConfirmed}  // Disable if proof is not available or already confirmed
+      >
+        <Text style={styles.buttonText}>Confirm Return</Text>
+      </TouchableOpacity>
+    )}
+
+    <Modal visible={modalVisible} transparent animationType="slide">
+      <View style={styles.modalContainer}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalText}>Are you sure you want to confirm?</Text>
+          <Text style={styles.modalText}>The item will be marked as Claimed</Text>
+          <View style={styles.modalButtons}>
+            <TouchableOpacity onPress={() => { 
+              confirmationAction?.(); 
+              setModalVisible(false); 
+            }} style={styles.button}>
+              <Text style={styles.buttonText}>Yes</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setModalVisible(false)} style={[styles.button, { backgroundColor: '#DC3545' }]}>
+              <Text style={styles.buttonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
-    </View>
-  </View>
-</Modal>
+    </Modal>
 
-      {/* Confirm Received button for Claimer */}
-      {isClaimer && (
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: proof ? '#4CAF50' : '#B0B0B0' }]}
-          onPress={handleConfirmReceived}
-          disabled={!proof}
-        >
-          <Text style={styles.buttonText}>Confirm Received</Text>
-        </TouchableOpacity>
-      )}
-
+    {/* Confirm Received button for Claimer */}
+    {isClaimer && (
+      <TouchableOpacity
+        style={[styles.button, {
+          backgroundColor: isReceivedConfirmed || !proof ? '#B0B0B0' : '#007BFF'  // Blue when enabled, Light Gray when disabled
+        }]}
+        onPress={handleConfirmReceived}
+        disabled={!proof || isReceivedConfirmed}  // Disable if proof is not available or already confirmed
+      >
+        <Text style={styles.buttonText}>Confirm Received</Text>
+      </TouchableOpacity>
+    )}
       
     </View>
   );

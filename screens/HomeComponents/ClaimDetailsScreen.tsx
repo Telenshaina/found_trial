@@ -281,25 +281,29 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
         )}
 
 
-      {isFinder && claim.finder_confirmed === false && (
-
-      <TouchableOpacity 
-      style={[styles.actionButton, { backgroundColor: '#FFA500' }]} 
-      onPress={() => navigation.navigate('TransactionScreen', { claim })}
+      {(isFinder || isClaimer) && (
+        <TouchableOpacity 
+        style={[
+          styles.actionButton, 
+          { 
+            backgroundColor: '#FFA500', 
+            opacity: claimStatus === 'approved' ? 1 : 0.5 
+          }
+        ]}
+        onPress={() => {
+          if (claimStatus === 'approved') {
+            navigation.navigate('TransactionScreen', { claim });
+          } else {
+            Alert.alert('Action Not Allowed', 'The claim must be approved before viewing the transaction process.');
+          }
+        }}
+        disabled={claimStatus !== 'approved'}
       >
-      <Text style={styles.actionButtonText}>View Transaction Process</Text>
+        <Text style={styles.actionButtonText}>View Transaction Process</Text>
       </TouchableOpacity>
+      
+      )}
 
-        )}
-
-        {isClaimer && claim.claimer_confirmed === false && (
-           <TouchableOpacity 
-           style={[styles.actionButton, { backgroundColor: '#FFA500' }]} 
-           onPress={() => navigation.navigate('TransactionScreen', { claim })}
-           >
-           <Text style={styles.actionButtonText}>View Transaction Process</Text>
-           </TouchableOpacity>
-        )}
         
 
       <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteClaim}>

@@ -1,9 +1,13 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, Alert, Modal } from 'react-native';
 import { RouteProp, useNavigation } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/types';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { supabase } from '../../supabase';
+import { useEffect, useState } from 'react';
+
+
+
 
 
 type ClaimDetailsScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'ClaimDetailsScreen'>;
@@ -17,6 +21,23 @@ type Props = {
 const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
   const { claim, incoming } = route.params;
   const navigation = useNavigation<ClaimDetailsScreenNavigationProp>();
+  const [userId, setUserId] = useState<string | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [actionType, setActionType] = useState<'finder' | 'claimer' | null>(null);
+
+  const isFinder = userId === claim.found_by;
+  const isClaimer = userId === claim.user_id;
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data, error } = await supabase.auth.getUser();
+      if (data?.user) {
+        setUserId(data.user.id);
+      }
+    };
+    fetchUser();
+  }, []);
+  
 
   const handleDeleteClaim = async () => {
     Alert.alert('Delete Claim', 'Are you sure you want to delete this claim?', [
@@ -59,7 +80,105 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
     }
   };
   
+  //This will change the item's status to claimed in the foundy_items table
+  const handleFinderConfirm = async () => {
+    try {
+      const { error } = await supabase
+        .from('claims')
+        .update({ finder_confirmed: true })
+        .eq('claim_id', claim.claim_id);
+  
+      if (error) throw error;
+  
+      checkFinalization();
+      Alert.alert('Success', 'You have confirmed returning the item.');
+    } catch (error: any) {
+      console.error('Error confirming return:', error.message);
+      Alert.alert('Error', 'Failed to confirm return.');
+    }
+  };
+  
+  const handleClaimerConfirm = async () => {
+    try {
+      const { error } = await supabase
+        .from('claims')
+        .update({ claimer_confirmed: true })
+        .eq('claim_id', claim.claim_id);
+  
+      if (error) throw error;
+  
+      checkFinalization();
+      Alert.alert('Success', 'You have confirmed receiving the item.');
+    } catch (error: any) {
+      console.error('Error confirming receipt:', error.message);
+      Alert.alert('Error', 'Failed to confirm receipt.');
+    }
+  };
 
+  const checkFinalization = async () => {
+    const { data, error } = await supabase
+      .from('claims')
+      .select('finder_confirmed, claimer_confirmed, item_id')
+      .eq('claim_id', claim.claim_id)
+      .single();
+  
+    if (error || !data) return;
+  
+    if (data.finder_confirmed && data.claimer_confirmed) {
+      await finalizeReturn(data.item_id);
+    }
+  };
+  
+  const finalizeReturn = async (itemId: number) => {
+    try {
+      const { error } = await supabase
+        .from('found_items')
+        .update({ status: 'claimed' })
+        .eq('item_id', itemId);
+  
+      if (error) throw error;
+  
+      Alert.alert('Success', 'The item has been marked as claimed.');
+      navigation.goBack();
+    } catch (error: any) {
+      console.error('Error finalizing return:', error.message);
+      Alert.alert('Error', 'Failed to finalize return.');
+    }
+  };
+  
+  // Handle confirmation update
+  const handleConfirmReturn = () => {
+    setActionType('finder');
+    setModalVisible(true);
+  };
+  
+  const handleConfirmReceived = () => {
+    setActionType('claimer');
+    setModalVisible(true);
+  };
+  
+  const confirmReturn = async () => {
+    const { error } = await supabase
+      .from('claims')
+      .update({ finder_confirmed: true })
+      .eq('claim_id', claim.claim_id);
+  
+    if (!error) Alert.alert('Success', 'Return confirmed.');
+  };
+  
+  const confirmReceived = async () => {
+    const { error } = await supabase
+      .from('claims')
+      .update({ claimer_confirmed: true })
+      .eq('claim_id', claim.claim_id);
+  
+    if (!error) Alert.alert('Success', 'Item received confirmed.');
+  };
+  
+  
+  
+  
+  
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -121,10 +240,67 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
         )}
 
 
+      {isFinder && claim.finder_confirmed === false && (
+
+          <TouchableOpacity 
+            style={[styles.actionButton, { backgroundColor: '#4CAF50' }]} 
+            onPress={handleConfirmReturn}
+          >
+            <Text style={styles.actionButtonText}>Confirm Return</Text>
+          </TouchableOpacity>
+        )}
+
+        {isClaimer && claim.claimer_confirmed === false && (
+          <TouchableOpacity 
+            style={[styles.actionButton, { backgroundColor: '#007AFF' }]} 
+            onPress={handleConfirmReceived}
+          >
+            <Text style={styles.actionButtonText}>Confirm Received</Text>
+
+          
+
+          </TouchableOpacity>
+        )}
+        
+
       <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteClaim}>
         <Text style={styles.deleteButtonText}>Delete Claim</Text>
       </TouchableOpacity>
+
+      <Modal visible={modalVisible} transparent animationType="slide">
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContainer}>
+          <Text style={styles.modalTitle}>
+            {actionType === 'finder' ? 'Confirm Return' : 'Confirm Received'}
+          </Text>
+          <Text style={styles.modalMessage}>
+            Are you sure you want to proceed?
+          </Text>
+
+          <View style={styles.modalButtons}>
+            <TouchableOpacity 
+              style={[styles.modalButton, { backgroundColor: '#FF4C4C' }]} 
+              onPress={() => setModalVisible(false)}
+            >
+              <Text style={styles.modalButtonText}>Cancel</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.modalButton, { backgroundColor: '#4CAF50' }]} 
+              onPress={() => {
+                setModalVisible(false);
+                actionType === 'finder' ? confirmReturn() : confirmReceived();
+              }}
+            >
+              <Text style={styles.modalButtonText}>Confirm</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+
     </ScrollView>
+
 
     
   );
@@ -186,6 +362,51 @@ const styles = StyleSheet.create({
     marginVertical: 10,
   },
   actionButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Dark transparent overlay
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    backgroundColor: '#fff',
+    width: '80%',
+    padding: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5, // For Android shadow effect
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  modalMessage: {
+    fontSize: 16,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 10,
+    marginHorizontal: 5,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  modalButtonText: {
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 16,

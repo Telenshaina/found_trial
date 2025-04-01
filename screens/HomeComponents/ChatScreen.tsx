@@ -8,11 +8,13 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
+  Modal,
 } from "react-native";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import type { RouteProp } from "@react-navigation/native";
 import { RootStackParamList } from "../../navigation/types";
 import { supabase } from "../../supabase";
+import { Alert } from "react-native"; 
 
 type ChatScreenRouteProp = RouteProp<RootStackParamList, "ChatScreen">;
 
@@ -40,7 +42,7 @@ const ChatScreen = () => {
 
   // 🔥 Replace this with actual logged-in user logic
   const [userId, setUserId] = useState<string | null>(null);
-
+  const [modalVisible, setModalVisible] = useState(false);
 useEffect(() => {
   const getUser = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -118,11 +120,10 @@ useEffect(() => {
       created_at: new Date().toISOString(),
     };
   
-    // ✅ Optimistic UI update
+   
     setMessages((prev) => [...prev, newMessage]);
     setInputText("");
   
-    // ✅ Insert into Supabase
     const { error } = await supabase.from("chats").insert([newMessage]);
     if (error) {
       console.error("Error sending message:", error.message);
@@ -173,6 +174,47 @@ useEffect(() => {
   
   
 
+  const handleApprove = async () => {
+    if (!claim_id || !userId) return;
+  
+    try {
+      // Update the claim status to "approved"
+      let { error: claimError } = await supabase
+        .from("claims")
+        .update({ status: "approved" })
+        .eq("claim_id", claim_id);
+  
+      if (claimError) throw claimError;
+  
+      // Find the item_id related to the claim
+      let { data: claimData, error: claimFetchError } = await supabase
+        .from("claims")
+        .select("item_id")
+        .eq("claim_id", claim_id)
+        .single();
+  
+      if (claimFetchError || !claimData) throw claimFetchError;
+  
+      const itemId = claimData.item_id;
+  
+      // Set item status to "return_pending"
+      let { error: itemError } = await supabase
+        .from("found_items")
+        .update({ status: "return_pending" })
+        .eq("item_id", itemId);
+  
+      if (itemError) throw itemError;
+  
+      alert("Claim approved! Proceed with returning the item.");
+    } catch (error: any) {
+      console.error("Error approving claim:", error.message);
+      alert("Failed to approve claim. Try again.");
+    }
+  };
+  
+
+  
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -181,6 +223,9 @@ useEffect(() => {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Chat about {item_name}</Text>
       </View>
+
+      
+
 
       <FlatList
       data={messages}
@@ -198,7 +243,14 @@ useEffect(() => {
       contentContainerStyle={{ paddingVertical: 20 }}
     />
 
-
+    {userId === uploader_id && (
+        <TouchableOpacity
+          style={styles.approveButton}
+          onPress={() => setModalVisible(true)} // ✅ Show modal on button press
+        >
+          <Text style={{ color: "#fff", fontWeight: "bold" }}>Approve Claim</Text>
+        </TouchableOpacity>
+      )}
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={80}
@@ -215,7 +267,41 @@ useEffect(() => {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Confirm Approval</Text>
+            <Text style={styles.modalText}>
+              Are you sure you want to approve this claim? This action cannot be undone.
+            </Text>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={{ color: "#fff" }}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.approveModalButton]}
+                onPress={handleApprove}
+              >
+                <Text style={{ color: "#fff" }}>Approve</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
+
+    
   );
 };
 
@@ -270,6 +356,38 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     justifyContent: "center",
   },
+  approveButton: {
+    backgroundColor: "green",
+    padding: 10,
+    margin: 10,
+    borderRadius: 5,
+    alignItems: "center",
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)", // Semi-transparent background
+  },
+  modalContent: {
+    backgroundColor: "white",
+    padding: 20,
+    borderRadius: 10,
+    width: "80%",
+    alignItems: "center",
+  },
+  modalTitle: { fontSize: 20, fontWeight: "bold", marginBottom: 10 },
+  modalText: { fontSize: 16, textAlign: "center", marginBottom: 20 },
+  modalButtons: { flexDirection: "row", justifyContent: "space-around", width: "100%" },
+  modalButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+    marginHorizontal: 10,
+  },
+  cancelButton: { backgroundColor: "gray" },
+  approveModalButton: { backgroundColor: "green" },
+  
 });
 
 export default ChatScreen;

@@ -16,6 +16,7 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
   const [isStatusModalVisible, setStatusModalVisible] = useState(false);
   const [proofImage, setProofImage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [foundItemStatus, setFoundItemStatus] = useState<string | null>(null);
   const [proofData, setProofData] = useState({
     name: "",
     email: "",
@@ -62,13 +63,36 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
     fetchUser();
   }, [item.found_by]);
 
-  const handleButtonPress = () => {
-    if (isOwner) {
-      setStatusModalVisible(true);
-    } else {
-      setProofModalVisible(true);
-    }
-  };
+
+    
+
+    // Fetch the status of the found item
+    useEffect(() => {
+      const fetchItemStatus = async () => {
+        const { data, error } = await supabase
+          .from('found_items')
+          .select('status')
+          .eq('item_id', item.item_id)
+          .single();
+
+        if (data) {
+          setFoundItemStatus(data.status);
+        }
+        if (error) {
+          console.error('Error fetching item status:', error);
+        }
+      };
+
+      fetchItemStatus();
+    }, [item.item_id]);
+
+      const handleButtonPress = () => {
+        if (isOwner) {
+          setStatusModalVisible(true);
+        } else {
+          setProofModalVisible(true);
+        }
+      };
 
   // Function to pick an image for proof submission
   const handlePickImage = async () => {
@@ -177,9 +201,24 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.row}>
           <Text style={styles.itemName}>{item.item_name}</Text>
-          <View style={styles.unclaimedBadge}>
-            <Text style={styles.unclaimedText}>Unclaimed</Text>
+          <View 
+            style={[
+              styles.unclaimedBadge, 
+              foundItemStatus?.toLowerCase() === "claimed" && styles.claimedBadge
+            ]}
+          >
+            <Text 
+              style={[
+                styles.unclaimedText, 
+                foundItemStatus?.toLowerCase() === "claimed" && styles.claimedText
+              ]}
+            >
+              {foundItemStatus 
+                ? foundItemStatus.charAt(0).toUpperCase() + foundItemStatus.slice(1) 
+                : "Loading..."}
+            </Text>
           </View>
+
         </View>
 
         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
@@ -348,7 +387,17 @@ const styles = StyleSheet.create({
   itemName: { fontSize: 20, fontWeight: 'bold' },
   unclaimedBadge: { backgroundColor: '#FCE7F3', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   unclaimedText: { fontSize: 12, color: '#9D174D', fontWeight: 'bold' },
-
+  claimedBadge: {
+    backgroundColor: "#D1FAE5", // Light green background
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  claimedText: {
+    color: "#065F46", // Dark green text
+    fontWeight: "bold",
+  },
+  
   postedBy: { fontSize: 12, color: '#6B7280', marginTop: 4 },
   guestTag: {
     backgroundColor: '#FFD700',

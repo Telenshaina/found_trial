@@ -13,12 +13,12 @@ export type RootStackParamList = {
   FoundItemDetails: {item: any };
   LostItemDetails: { item: any };
   TransactionPage: undefined;
+  ClaimedItems: undefined;
   ClaimDetailsScreen: { claim: any; incoming: boolean };
   ListOfCategorizedItems: { title: string };
   
 
-  ChatScreen: { uploader_id: string; item_name: string };
-
+  ChatScreen: { uploader_id: string; item_name: string; claim_id: string };
 
 };
 

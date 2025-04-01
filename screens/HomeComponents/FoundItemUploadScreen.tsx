@@ -98,8 +98,15 @@ const FoundItemUploadScreen = () => {
         alert('User not authenticated. Please log in.');
         return;
       }
-
       const userId = user.user.id; // Extract user ID
+      const userEmail = user.user.email || ''; // Extract user email
+      // Determine user type based on email
+      let userType = 'Guest'; // Default to 'Guest'
+      if (userEmail.endsWith('neu.edu.ph')) {
+        userType = 'Institutional';
+      }
+
+      
       const fileName = `images/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.jpg`;
       const response = await fetch(image);
       const blob = await response.blob();
@@ -137,14 +144,30 @@ const FoundItemUploadScreen = () => {
         alert(`Failed to upload item: ${dbError.message}`);
         return;
       }
-  
+      // Log the activity in user_logs
+      const { error: logError } = await supabase.from('user_logs').insert([
+        {
+          user_id: userId,
+          name: user.user.user_metadata?.full_name || 'Unknown User',
+          email: userEmail,
+          activity_type: 'Found Item',
+          user_type: userType,
+          timestamp: new Date(),
+        },
+      ]);
+
+      if (logError) {
+        console.error('Log error:', logError);
+      }
+
       alert('Item uploaded successfully!');
       navigation.navigate('Home');
-    } catch (err) {
+
+      } catch (err) {
       console.error('Unexpected error:', err);
       alert('Something went wrong. Please try again.');
-    }
-  };
+      }
+      };
   
   // UI Implementation for Found Items Form
   return (

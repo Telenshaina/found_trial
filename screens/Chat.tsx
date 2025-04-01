@@ -48,14 +48,16 @@ const Chat = () => {
   const params: any = route.params;
   const uploaderContact = contacts.find((c) => c.id === params?.uploader_id);
 
-  const chatContacts = uploaderContact ? [uploaderContact] : contacts;
-
-  const handleContactPress = (contact: any) => {
+  const chatContacts = uploaderContact ? [uploaderContact] : contacts;const handleContactPress = (contact: any) => {
     navigation.navigate("ChatScreen", {
-      uploader_id: contact.id,
+      claim_id: params?.claim_id, // Ensure claim_id is passed
+      user_id: params?.user_id, // Ensure user_id is passed
+      uploader_id: contact.id, // Contact ID becomes the uploader ID
       item_name: params?.item_name ?? "General",
     });
   };
+  
+  
 
   return (
     <SafeAreaView style={styles.container}>

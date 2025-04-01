@@ -41,6 +41,7 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
     navigation.navigate('ChatScreen', {
       uploader_id: claim.found_by, 
       item_name: claim.item_name,
+      claim_id: claim.claim_id, // Added claim_id here
     });
   };
 
@@ -94,9 +95,11 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
         )}
       </View>
 
-      {claim.status.toLowerCase() === 'approved' && (
+      {(claim.status.toLowerCase() === 'pending' || claim.status.toLowerCase() === 'approved') && (
         <TouchableOpacity style={styles.chatButton} onPress={handleChatPress}>
-          <Text style={styles.chatButtonText}>Chat with Uploader</Text>
+          <Text style={styles.chatButtonText}>
+            {claim.status.toLowerCase() === 'pending' ? 'Chat with Uploader' : 'Open Chat'}
+          </Text>
         </TouchableOpacity>
       )}
 

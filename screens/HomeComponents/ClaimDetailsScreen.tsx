@@ -7,9 +7,6 @@ import { supabase } from '../../supabase';
 import { useEffect, useState } from 'react';
 
 
-
-
-
 type ClaimDetailsScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'ClaimDetailsScreen'>;
 
 type ClaimDetailsScreenRouteProp = RouteProp<RootStackParamList, 'ClaimDetailsScreen'>;
@@ -24,6 +21,9 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
   const [userId, setUserId] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [actionType, setActionType] = useState<'finder' | 'claimer' | null>(null);
+  const [hasChatted, setHasChatted] = useState(false);
+  const [claimStatus, setClaimStatus] = useState<string | null>(null);
+
 
   const isFinder = userId === claim.found_by;
   const isClaimer = userId === claim.user_id;
@@ -38,7 +38,25 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
     fetchUser();
   }, []);
   
-
+  //to get the claim stats
+  useEffect(() => {
+    const fetchClaimStatus = async () => {
+      const { data, error } = await supabase
+        .from('claims')
+        .select('status')
+        .eq('claim_id', claim.claim_id)
+        .single();
+  
+      if (error) {
+        console.error('Error fetching claim status:', error);
+      } else {
+        setClaimStatus(data?.status || null);
+      }
+    };
+  
+    fetchClaimStatus();
+  }, [claim.claim_id]); 
+  
   const handleDeleteClaim = async () => {
     Alert.alert('Delete Claim', 'Are you sure you want to delete this claim?', [
       { text: 'Cancel', style: 'cancel' },
@@ -58,27 +76,9 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
     ]);
   };
 
-  const handleChatPress = () => {
-    navigation.navigate('ChatScreen', {
-      uploader_id: claim.found_by, 
-      item_name: claim.item_name,
-      claim_id: claim.claim_id, // Added claim_id here
-    });
-  };
-
-  const handleStatusUpdate = async (status: 'approved' | 'rejected') => {
-    const { error } = await supabase
-      .from('claims')
-      .update({ status })
-      .eq('claim_id', claim.claim_id);
   
-    if (error) {
-      Alert.alert('Error', `Failed to ${status} claim.`);
-    } else {
-      Alert.alert('Success', `Claim has been ${status}.`);
-      navigation.goBack();
-    }
-  };
+
+  
   
   //This will change the item's status to claimed in the foundy_items table
   const handleFinderConfirm = async () => {
@@ -147,16 +147,57 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
   };
   
   // Handle confirmation update
-  const handleConfirmReturn = () => {
-    setActionType('finder');
-    setModalVisible(true);
+  useEffect(() => {
+    const checkChatHistory = async () => {
+      const { data } = await supabase
+        .from('chats')
+        .select('*')
+        .or(`sender_id.eq.${claim.found_by},receiver_id.eq.${claim.user_id}`)
+        .or(`sender_id.eq.${claim.user_id},receiver_id.eq.${claim.found_by}`)
+        .eq('claim_id', claim.claim_id);
+        setHasChatted(data && data.length > 0 ? true : false);
+
+    };
+    checkChatHistory();
+  }, [claim]);
+
+  const handleChatPress = () => {
+    navigation.navigate('ChatScreen', {
+      uploader_id: claim.found_by,
+      item_name: claim.item_name,
+      claim_id: claim.claim_id,
+    });
+  };
+
+  const handleStatusUpdate = async (status: 'approved' | 'rejected') => {
+    if (!hasChatted) {
+      Alert.alert('Chat Required', 'You need to chat before taking action.');
+      return;
+    }
+    await supabase.from('claims').update({ status }).eq('claim_id', claim.claim_id);
+    Alert.alert('Success', `Claim has been ${status}.`);
+    navigation.goBack();
+  };
+
+  const handleConfirmReturn = async () => {
+    if (!hasChatted) {
+      Alert.alert('Chat Required', 'You need to chat before taking action.');
+      return;
+    }
+    await supabase.from('claims').update({ finder_confirmed: true }).eq('claim_id', claim.claim_id);
+    Alert.alert('Success', 'Return confirmed.');
+  };
+
+  const handleConfirmReceived = async () => {
+    if (!hasChatted) {
+      Alert.alert('Chat Required', 'You need to chat before taking action.');
+      return;
+    }
+    await supabase.from('claims').update({ claimer_confirmed: true }).eq('claim_id', claim.claim_id);
+    Alert.alert('Success', 'Item received confirmed.');
   };
   
-  const handleConfirmReceived = () => {
-    setActionType('claimer');
-    setModalVisible(true);
-  };
-  
+  //approve button
   const confirmReturn = async () => {
     const { error } = await supabase
       .from('claims')
@@ -217,7 +258,7 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
       {(claim.status.toLowerCase() === 'pending' || claim.status.toLowerCase() === 'approved') && (
         <TouchableOpacity style={styles.chatButton} onPress={handleChatPress}>
           <Text style={styles.chatButtonText}>
-            {claim.status.toLowerCase() === 'pending' ? 'Chat with Uploader' : 'Open Chat'}
+            {isFinder ? 'Chat with Claimer' : 'Chat with Uploader'}
           </Text>
         </TouchableOpacity>
       )}
@@ -242,24 +283,33 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
 
       {isFinder && claim.finder_confirmed === false && (
 
-          <TouchableOpacity 
-            style={[styles.actionButton, { backgroundColor: '#4CAF50' }]} 
-            onPress={handleConfirmReturn}
-          >
-            <Text style={styles.actionButtonText}>Confirm Return</Text>
-          </TouchableOpacity>
+        <TouchableOpacity 
+        style={[
+          styles.actionButton, 
+          { 
+            backgroundColor: claimStatus !== 'approved' ? '#B0B0B0' : '#4CAF50' // Disabled button color
+          }
+        ]} 
+        onPress={handleConfirmReturn}
+        disabled={claimStatus !== 'approved'}
+        >
+        <Text style={styles.actionButtonText}>Confirm Return</Text>
+        </TouchableOpacity>
         )}
 
         {isClaimer && claim.claimer_confirmed === false && (
-          <TouchableOpacity 
-            style={[styles.actionButton, { backgroundColor: '#007AFF' }]} 
-            onPress={handleConfirmReceived}
-          >
-            <Text style={styles.actionButtonText}>Confirm Received</Text>
-
-          
-
-          </TouchableOpacity>
+           <TouchableOpacity 
+                style={[
+                  styles.actionButton, 
+                  { 
+                    backgroundColor: claimStatus !== 'approved' ? '#B0B0B0' : '#007AFF' // Disabled button color
+                  }
+                ]} 
+                onPress={handleConfirmReceived}
+                disabled={claimStatus !== 'approved'}
+              >
+                <Text style={styles.actionButtonText}>Confirm Received</Text>
+         </TouchableOpacity>
         )}
         
 

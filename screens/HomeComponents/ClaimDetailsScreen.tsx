@@ -283,33 +283,22 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
 
       {isFinder && claim.finder_confirmed === false && (
 
-        <TouchableOpacity 
-        style={[
-          styles.actionButton, 
-          { 
-            backgroundColor: claimStatus !== 'approved' ? '#B0B0B0' : '#4CAF50' // Disabled button color
-          }
-        ]} 
-        onPress={handleConfirmReturn}
-        disabled={claimStatus !== 'approved'}
-        >
-        <Text style={styles.actionButtonText}>Confirm Return</Text>
-        </TouchableOpacity>
+      <TouchableOpacity 
+      style={[styles.actionButton, { backgroundColor: '#FFA500' }]} 
+      onPress={() => navigation.navigate('TransactionScreen', { claim })}
+      >
+      <Text style={styles.actionButtonText}>View Transaction Process</Text>
+      </TouchableOpacity>
+
         )}
 
         {isClaimer && claim.claimer_confirmed === false && (
            <TouchableOpacity 
-                style={[
-                  styles.actionButton, 
-                  { 
-                    backgroundColor: claimStatus !== 'approved' ? '#B0B0B0' : '#007AFF' // Disabled button color
-                  }
-                ]} 
-                onPress={handleConfirmReceived}
-                disabled={claimStatus !== 'approved'}
-              >
-                <Text style={styles.actionButtonText}>Confirm Received</Text>
-         </TouchableOpacity>
+           style={[styles.actionButton, { backgroundColor: '#FFA500' }]} 
+           onPress={() => navigation.navigate('TransactionScreen', { claim })}
+           >
+           <Text style={styles.actionButtonText}>View Transaction Process</Text>
+           </TouchableOpacity>
         )}
         
 

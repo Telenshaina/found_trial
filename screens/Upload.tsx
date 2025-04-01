@@ -7,18 +7,18 @@ import FoundItemForm from './HomeComponents/FoundItemUploadScreen';
 
 const Upload = () => {
   const layout = useWindowDimensions();
-  const [index, setIndex] = useState(1);
+  const [index, setIndex] = useState(0);
   const [routes] = useState([
-    { key: 'missing', title: 'Report Lost Item' },
     { key: 'found', title: 'Report Found Item' },
+    { key: 'missing', title: 'Report Lost Item' },
   ]);
 
   const renderScene = ({ route }: { route: { key: string } }) => {
     switch (route.key) {
-      case 'missing':
-        return <LostItemForm />;
       case 'found':
         return <FoundItemForm />;
+      case 'missing':
+        return <LostItemForm />;
       default:
         return null;
     }

@@ -1,170 +1,221 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   FlatList,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
 } from "react-native";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import type { RouteProp } from "@react-navigation/native";
-import { supabase } from "../../supabase";
 import { RootStackParamList } from "../../navigation/types";
+import { supabase } from "../../supabase";
 
 type ChatScreenRouteProp = RouteProp<RootStackParamList, "ChatScreen">;
 
-interface ChatMessage {
-  id: string;
-  sender_id: string;
-  receiver_id: string;
-  message: string;
-  created_at: string;
-}
-
 const ChatScreen = () => {
-  const navigation = useNavigation();
   const route = useRoute<ChatScreenRouteProp>();
-  const [claimId, setClaimId] = useState<string | null>(route.params.claim_id);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [inputText, setInputText] = useState("");
-  const { claim_id, uploader_id, user_id, item_name } = route.params as {
-    claim_id: string;
-    uploader_id: string;
-    user_id: string;
-    item_name: string;
-  };
+  const navigation = useNavigation();
+
+  // ✅ Log route params to check if claim_id is passed
+  console.log("Route Params:", route.params);
+
+  // ✅ Ensure claim_id is properly received
+  const { uploader_id, item_name, claim_id } = route.params ?? {};
   
+  if (!claim_id) {
+    console.error("❌ claim_id is missing! Check navigation.");
+    return (
+      <View style={styles.container}>
+        <Text style={{ color: "red", fontSize: 16 }}>Error: Missing claim_id.</Text>
+      </View>
+    );
+  }
+
+  const [messages, setMessages] = useState<any[]>([]);
+  const [inputText, setInputText] = useState("");
+
+  // 🔥 Replace this with actual logged-in user logic
+  const [userId, setUserId] = useState<string | null>(null);
+
+useEffect(() => {
+  const getUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      setUserId(user.id);
+    }
+  };
+  getUser();
+}, []);
+
+  const receiverId = uploader_id; // The uploader (finder) of the item
+
+  // ✅ Fetch messages from Supabase
   useEffect(() => {
     const fetchMessages = async () => {
-      if (!claimId) return;
       const { data, error } = await supabase
         .from("chats")
         .select("*")
-        .eq("claim_id", claimId)
+        .eq("claim_id", claim_id) // ✅ Ensure claim_id is used
         .order("created_at", { ascending: true });
 
-      if (error) console.error("Error fetching messages:", error);
-      else setMessages(data || []);
+      if (error) {
+        console.error("Error fetching messages:", error.message);
+      } else {
+        setMessages(data);
+      }
     };
 
     fetchMessages();
 
+    // ✅ Real-time subscription for new messages
     const subscription = supabase
-      .channel("chats")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chats" }, (payload) => {
-        const newMessage: ChatMessage = {
-          id: payload.new.id,
-          sender_id: payload.new.sender_id,
-          receiver_id: payload.new.receiver_id,
-          message: payload.new.message,
-          created_at: payload.new.created_at,
-        };
-        setMessages((prevMessages) => [...prevMessages, newMessage]);
-      })
+      .channel(`chats:claim_id=${claim_id}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "chats", filter: `claim_id=eq.${claim_id}` },
+        (payload) => {
+          setMessages((prev) => [...prev, payload.new]);
+        }
+      )
       .subscribe();
 
     return () => {
       supabase.removeChannel(subscription);
     };
-  }, [claimId]);
+  }, [claim_id]);
 
+  // ✅ Handle sending messages
   const handleSend = async () => {
-    if (!claimId || inputText.trim() === "") return;
-
-    const newMessage = {
-      claim_id: claimId,
-      sender_id: user_id,
-      receiver_id: uploader_id,
-      message: inputText,
-    };
-    
-
-    const { error } = await supabase.from("chats").insert(newMessage);
-
-    if (error) console.error("Error sending message:", error);
-    else setInputText("");
-  };
-
-  const approveClaim = async () => {
-    Alert.alert(
-      "Confirm Approval", 
-      "Do you approve the claim?", 
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
-          text: "Approve",
-          onPress: async () => {
-            if (!claimId) return;
-            const { error } = await supabase
-              .from("claims")
-              .update({ status: "approved" }) // Update claim status
-              .eq("id", claimId);
+    if (inputText.trim() === "" || !userId) return; // Ensure userId is valid
   
-            if (error) {
-              console.error("Error approving claim:", error);
-              Alert.alert("Error", "Something went wrong. Please try again.");
-            } else {
-              Alert.alert("Success", "Claim approved successfully!");
-            }
-          },
-        },
-      ]
-    );
+    let finalReceiverId = receiverId; // Default to uploader_id
+  
+    // ✅ Fetch `user_id` from the `claims` table if the current user is the uploader
+    if (userId === receiverId) {
+      const { data, error } = await supabase
+        .from("claims")
+        .select("user_id")
+        .eq("claim_id", claim_id)
+        .single(); // Get only one record
+  
+      if (error) {
+        console.error("Error fetching claim user_id:", error.message);
+        return;
+      }
+  
+      finalReceiverId = data?.user_id ?? receiverId; // Use claim's user_id if available
+    }
+  
+    const newMessage = {
+      claim_id, 
+      sender_id: userId, 
+      receiver_id: finalReceiverId, 
+      message: inputText, 
+      created_at: new Date().toISOString(),
+    };
+  
+    // ✅ Optimistic UI update
+    setMessages((prev) => [...prev, newMessage]);
+    setInputText("");
+  
+    // ✅ Insert into Supabase
+    const { error } = await supabase.from("chats").insert([newMessage]);
+    if (error) {
+      console.error("Error sending message:", error.message);
+      setMessages((prev) => prev.filter((msg) => msg !== newMessage)); // Rollback if failed
+    }
   };
+  
+
+  useEffect(() => {
+    if (!userId) return;
+  
+    const fetchMessages = async () => {
+      const { data, error } = await supabase
+        .from("chats")
+        .select("*")
+        .eq("claim_id", claim_id)
+        .order("created_at", { ascending: true });
+  
+      if (error) {
+        console.error("Error fetching messages:", error.message);
+      } else {
+        setMessages(data);
+      }
+    };
+  
+    fetchMessages();
+  
+    const subscription = supabase
+      .channel(`chats:claim_id=${claim_id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "chats",
+          filter: `claim_id=eq.${claim_id}`,
+        },
+        (payload) => {
+          setMessages((prev) => [...prev, payload.new]);
+        }
+      )
+      .subscribe();
+  
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, [claim_id, userId]);
+  
   
 
   return (
     <View style={styles.container}>
-  <View style={styles.header}>
-    <TouchableOpacity onPress={() => navigation.goBack()}>
-      <Text style={styles.backText}>← Back</Text>
-    </TouchableOpacity>
-    <Text style={styles.headerTitle}>Chat about {item_name}</Text>
-  </View>
-
-  <FlatList
-    data={messages}
-    keyExtractor={(item) => item.id}
-    renderItem={({ item }) => (
-      <View
-        style={[
-          styles.messageBubble,
-          item.sender_id === user_id ? styles.myMessage : styles.theirMessage,
-        ]}
-      >
-        <Text style={styles.messageText}>{item.message}</Text>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Text style={styles.backText}>← Back</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Chat about {item_name}</Text>
       </View>
-    )}
-    contentContainerStyle={{ paddingVertical: 20 }}
-  />
 
-  {/* Approve Button */}
-  <TouchableOpacity style={styles.approveButton} onPress={approveClaim}>
-    <Text style={styles.approveButtonText}>Approve Claim</Text>
-  </TouchableOpacity>
+      <FlatList
+      data={messages}
+      keyExtractor={(item) => item.chat_id?.toString() || Math.random().toString()}
+      renderItem={({ item }) => (
+        <View
+          style={[
+            styles.messageBubble,
+            item.sender_id === userId ? styles.myMessage : styles.theirMessage,
+          ]}
+        >
+          <Text style={styles.messageText}>{item.message}</Text>
+        </View>
+      )}
+      contentContainerStyle={{ paddingVertical: 20 }}
+    />
 
-  <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={80}>
-    <View style={styles.inputContainer}>
-      <TextInput
-        placeholder="Type a message..."
-        style={styles.textInput}
-        value={inputText}
-        onChangeText={setInputText}
-      />
-      <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
-        <Text style={{ color: "#fff", fontWeight: "bold" }}>Send</Text>
-      </TouchableOpacity>
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={80}
+      >
+        <View style={styles.inputContainer}>
+          <TextInput
+            placeholder="Type a message..."
+            style={styles.textInput}
+            value={inputText}
+            onChangeText={setInputText}
+          />
+          <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
+            <Text style={{ color: "#fff", fontWeight: "bold" }}>Send</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
     </View>
-  </KeyboardAvoidingView>
-</View>
-
   );
 };
 
@@ -219,20 +270,6 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     justifyContent: "center",
   },
-  approveButton: {
-    backgroundColor: "#28a745", // Green color
-    padding: 12,
-    borderRadius: 10,
-    alignItems: "center",
-    margin: 10,
-  },
-  
-  approveButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 16,
-  },
-  
 });
 
 export default ChatScreen;

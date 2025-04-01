@@ -262,14 +262,34 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
 
       {/* Fixed Bottom Button */}
       <View style={styles.bottomButtonContainer}>
-        {isOwner && <Text style={styles.ownerNote}>This is your item</Text>}
-        
-        <TouchableOpacity style={styles.claimButton} onPress={handleButtonPress}>
-          <Text style={styles.claimButtonText}>
-            {isOwner ? 'Check Status' : 'Claim Item'}
-          </Text>
-        </TouchableOpacity>
-      </View>
+  {isOwner && <Text style={styles.ownerNote}>This is your item</Text>}
+
+  {foundItemStatus?.toLowerCase() === "claimed" ? (
+    // If the item is claimed, check if the current user is the one who claimed it
+    item.claimed_by === authUserId ? (
+      <Text style={styles.claimedText}>You claimed this item</Text>
+    ) : (
+      <TouchableOpacity
+        style={styles.claimButton}
+        onPress={() => {
+          // Logic for filing a claim report goes here
+          alert("Filing a Claim Report...");
+        }}
+      >
+        <Text style={styles.claimButtonText}>File a Claim Report</Text>
+      </TouchableOpacity>
+    )
+  ) : (
+    // If the item is not claimed, show the claim button
+    <TouchableOpacity style={styles.claimButton} onPress={handleButtonPress}>
+      <Text style={styles.claimButtonText}>
+        {isOwner ? 'Check Status' : 'Claim Item'}
+      </Text>
+    </TouchableOpacity>
+  )}
+</View>
+
+
 
       {/* Proof Submission Modal */}
       <Modal visible={isProofModalVisible} animationType="slide" transparent>

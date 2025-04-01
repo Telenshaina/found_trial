@@ -221,7 +221,7 @@ const TransactionScreen: React.FC<Props> = ({ route }) => {
   const checkAndUpdateItemStatus = async () => {
     const { data, error } = await supabase
       .from('claims')
-      .select('finder_confirmed, claimer_confirmed, item_id')
+      .select('finder_confirmed, claimer_confirmed,item_id, user_id') // Fetching user_id as the Claimed_by user
       .eq('claim_id', claim.claim_id)
       .single();
   
@@ -230,20 +230,24 @@ const TransactionScreen: React.FC<Props> = ({ route }) => {
       return;
     }
   
+    // If both finder and claimer have confirmed, update the found_items status to "Claimed"
     if (data.finder_confirmed && data.claimer_confirmed) {
-      // Ensure found_item_id is available
       const { error: updateError } = await supabase
         .from('found_items')
-        .update({ status: 'Claimed' })
+        .update({
+          status: 'Claimed',
+          claimed_by: data.user_id // Update the Claimed_by column with the user_id of the claimer
+        })
         .eq('item_id', data.item_id);
   
       if (updateError) {
         console.error('Error updating item status:', updateError.message);
       } else {
-        console.log('Item status updated to "Claimed"');
+        console.log('Item status updated to "Claimed" and Claimed_by updated');
       }
     }
   };
+  
   
   
   // Call this function after confirming the return or the received status.

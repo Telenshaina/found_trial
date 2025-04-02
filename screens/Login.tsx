@@ -31,21 +31,21 @@ const logUserActivity = async (userId: string, name: string, email: string, acti
   } else {
     console.log(`${activityType} activity recorded for ${userType} user: ${name} (${email})`);
   }
-};  
+};
 
 const Tab = createMaterialTopTabNavigator();
-
 
 const Login: React.FC = () => (
   <View style={styles.container}>
     <Image source={require("../assets/neu-logo.png")} style={styles.logo} />
     <Text style={styles.title}>
-      Found<Text style={{ color: "green" }}>NEU</Text>
+      <Text style={{ color: "#2E7D32" }}>Found</Text>
+      <Text style={{ color: "#FFB902" }}>NEU</Text>
     </Text>
     <Tab.Navigator
       screenOptions={{
         tabBarStyle: { backgroundColor: "white", elevation: 0, shadowOpacity: 0 },
-        tabBarIndicatorStyle: { backgroundColor: "#d32f2f" },
+        tabBarIndicatorStyle: { backgroundColor: "#FFB902" },
         tabBarLabelStyle: { fontWeight: "bold", textTransform: "none" },
       }}
     >
@@ -65,7 +65,28 @@ const InstitutionalLogin: React.FC = () => {
         const { id: userId, email, user_metadata } = session.user;
         const name = user_metadata.full_name;
   
-        await logUserActivity(userId, name, email, "Institutional", "login");
+        // Check if user is banned in institutional_users
+        const { data: user, error } = await supabase
+          .from("institutional_users")
+          .select("status")
+          .eq("id", userId)
+          .single();
+  
+        if (error) {
+          console.error("Error fetching user status:", error.message);
+          return;
+        }
+  
+        if (user?.status === "banned") {
+          Alert.alert(
+            "You are banned",
+            "If you think this is a mistake, please contact an admin."
+          );
+          await supabase.auth.signOut(); 
+          return;
+        }
+  
+        await logUserActivity(userId, name, email, "login", "Institutional");
         navigation.replace("Main");
       } else if (session) {
         Alert.alert("Unauthorized", "Only institutional accounts can log in on this tab. Try logging in as a guest.");
@@ -76,36 +97,27 @@ const InstitutionalLogin: React.FC = () => {
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, []);
+  }, []);  
 
-  
-  // 🔹 Handle Google Sign-In
   const handleGoogleSignIn = async () => {
     setLoading(true);
     try {
       const redirectUri = AuthSession.makeRedirectUri({
-        native: "found-neu-1://", 
-       
-
-
+        native: "found-neu-1://",
       });
-  
-      console.log("Redirect URI:", redirectUri);
-  
+
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo: redirectUri,
         },
       });
-  
+
       if (error) throw error;
-  
+
       if (data?.url) {
-        console.log("Opening browser with:", data.url);
         const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
         console.log("Browser result:", result);
-        // The auth state change listener should pick up the session after this
       }
     } catch (error) {
       console.error("Login Error:", error);
@@ -114,21 +126,21 @@ const InstitutionalLogin: React.FC = () => {
       setLoading(false);
     }
   };
-  
-  
-
-  
 
   return (
     <View style={styles.loginContainer}>
       <Text style={styles.description}>
-        Welcome to New Era University’s very own <Text style={{ color: "green" }}>lost & found</Text> app!
+        Welcome to New Era University’s very
       </Text>
+      <Text style={styles.description}>
+        own <Text style={{ color: "green" }}>lost & found</Text> app!
+      </Text>
+
       <Text style={styles.subText}>
         FoundNEU is NEU’s official platform for reporting, tracking, and recovering lost items within our community. Whether you’ve lost or found something, our system helps reconnect belongings with their rightful owners efficiently.
       </Text>
-      <TouchableOpacity style={styles.signInButton} onPress={handleGoogleSignIn}> 
-        <Text style={styles.signInText}>Enter as NEU Member</Text>
+      <TouchableOpacity style={styles.signInButton} onPress={handleGoogleSignIn}>
+        <Text style={styles.signInText}>Enter as Institutional User</Text>
       </TouchableOpacity>
     </View>
   );
@@ -140,14 +152,9 @@ const GuestLogin: React.FC = () => {
 
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth Event:", event);
-      console.log("Session:", session);
-  
       if (session?.user) {
-        console.log("User Object:", session.user);
-  
         const userId = session.user.id;
-        const email = session.user.email; // 🔍 Debugging here
+        const email = session.user.email;
         const name = session.user.user_metadata?.full_name || "Guest User";
   
         if (!email) {
@@ -156,6 +163,27 @@ const GuestLogin: React.FC = () => {
         }
   
         const userType = email.endsWith("@gmail.com") ? "Guest" : "Institutional";
+  
+        // Check if user is banned in guest_users
+        const { data: user, error } = await supabase
+          .from("guest_users")
+          .select("status")
+          .eq("id", userId)
+          .single();
+  
+        if (error) {
+          console.error("Error fetching user status:", error.message);
+          return;
+        }
+  
+        if (user?.status === "banned") {
+          Alert.alert(
+            "You are banned",
+            "If you think this is a mistake, please contact an admin."
+          );
+          await supabase.auth.signOut();
+          return;
+        }
   
         await logUserActivity(userId, name, email, "login", userType);
         navigation.replace("Setup");
@@ -167,22 +195,18 @@ const GuestLogin: React.FC = () => {
     };
   }, []);
   
-  
-  
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
     try {
       const redirectUri = AuthSession.makeRedirectUri();
 
-      // Start Google OAuth flow
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: { redirectTo: redirectUri },
       });
 
       if (error) throw error;
-      console.log("Login initiated. Waiting for session...");
     } catch (error) {
       console.error("Login Error:", error);
       Alert.alert("Login Failed", "Something went wrong. Please try again.");
@@ -191,13 +215,11 @@ const GuestLogin: React.FC = () => {
     }
   };
 
-  
-
   return (
     <View style={styles.loginContainer}>
-      <Text style={styles.description}>Hello, dear visitor!</Text>
+      <Text style={styles.description}>Hello, Dear Visitor!</Text>
       <Text style={styles.subText}>Continue as a guest to browse the platform.</Text>
-      <TouchableOpacity style={styles.signInButton} onPress={handleGoogleSignIn}> 
+      <TouchableOpacity style={styles.signInButton} onPress={handleGoogleSignIn}>
         <Text style={styles.signInText}>Enter as Guest</Text>
       </TouchableOpacity>
     </View>
@@ -230,26 +252,26 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     textAlign: "center",
-    marginBottom: 10,
   },
   subText: {
     textAlign: "center",
+    marginTop: 20,
     marginBottom: 20,
     fontSize: 14,
     color: "#666",
   },
   signInButton: {
-    backgroundColor: "#d32f2f",
+    backgroundColor: "#2E7D32",
     paddingVertical: 12,
     paddingHorizontal: 20,
-    borderRadius: 5,
+    borderRadius: 25,
     width: "80%",
     alignItems: "center",
-    marginBottom: 10,
+    marginTop: 10,
   },
   signInText: {
     color: "#fff",
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "bold",
   },
 });

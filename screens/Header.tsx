@@ -23,8 +23,8 @@ const Header: React.FC<HeaderProps> = ({ showSearch = false }) => {
       {/* Logo Section */}
       <View style={styles.logoContainer}>
         <Image source={require("../assets/neu-logo.png")} style={styles.logo} />
-        <Text style={styles.logoTextRed}>Found</Text>
-        <Text style={styles.logoTextGreen}>NEU</Text>
+        <Text style={styles.logoTextGreen}>Found</Text>
+        <Text style={styles.logoTextYellow}>NEU</Text>
       </View>
 
       {/* Search Bar */}
@@ -66,13 +66,13 @@ const styles = StyleSheet.create({
     height: 32,
     marginRight: 8,
   },
-  logoTextRed: {
-    color: "#FF0000",
+  logoTextGreen: {
+    color: "#2E7D32",
     fontSize: 18,
     fontWeight: "bold",
   },
-  logoTextGreen: {
-    color: "#008000",
+  logoTextYellow: {
+    color: "#FFB902",
     fontSize: 18,
     fontWeight: "bold",
   },

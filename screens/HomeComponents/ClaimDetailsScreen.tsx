@@ -216,6 +216,42 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
     if (!error) Alert.alert('Success', 'Item received confirmed.');
   };
   
+  //update claim status
+  useEffect(() => {
+    // Subscribe to changes in found_items table
+    const channel = supabase
+      .channel('found_items')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'found_items' }, async (payload) => {
+        // Check if the status has changed to "Claimed"
+        if (payload.new.status === 'Claimed') {
+          // Update the status of the claim in the claims table
+          await updateClaimStatusToClaimed(claim.claim_id);
+        }
+      })
+      .subscribe();
+  
+    // Cleanup the subscription when the component unmounts
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+  const updateClaimStatusToClaimed = async (claimId: number) => {
+    try {
+      const { error } = await supabase
+        .from('claims')
+        .update({ status: 'Claimed' })
+        .eq('claim_id', claimId);
+  
+      if (error) throw error;
+  
+      Alert.alert('Success', 'Claim status updated to "Claimed".');
+    } catch (error: any) {
+      console.error('Error updating claim status:', error.message);
+      Alert.alert('Error', 'Failed to update claim status.');
+    }
+  };
+  
+  
   
   
   

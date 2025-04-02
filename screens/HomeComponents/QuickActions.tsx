@@ -15,7 +15,7 @@ const QuickActions: React.FC = () => {
           style={styles.button}
           onPress={() => navigation.navigate("ClaimedItems")}
         >
-          <Text style={styles.buttonText}>ClaimedItems</Text>
+          <Text style={styles.buttonText}>All Claimed Items</Text>
       </TouchableOpacity>
       <TouchableOpacity
           style={styles.button}

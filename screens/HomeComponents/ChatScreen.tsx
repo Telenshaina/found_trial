@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef  } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -9,12 +9,12 @@ import {
   Platform,
   StyleSheet,
   Modal,
+  Alert,
 } from "react-native";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import type { RouteProp } from "@react-navigation/native";
 import { RootStackParamList } from "../../navigation/types";
 import { supabase } from "../../supabase";
-import { Alert } from "react-native"; 
 
 type ChatScreenRouteProp = RouteProp<RootStackParamList, "ChatScreen">;
 
@@ -22,12 +22,8 @@ const ChatScreen = () => {
   const route = useRoute<ChatScreenRouteProp>();
   const navigation = useNavigation();
 
-  // ✅ Log route params to check if claim_id is passed
-  console.log("Route Params:", route.params);
-
-  // ✅ Ensure claim_id is properly received
   const { uploader_id, item_name, claim_id } = route.params ?? {};
-  
+
   if (!claim_id) {
     console.error("❌ claim_id is missing! Check navigation.");
     return (
@@ -39,47 +35,45 @@ const ChatScreen = () => {
 
   const [messages, setMessages] = useState<any[]>([]);
   const [inputText, setInputText] = useState("");
-
-  // 🔥 Replace this with actual logged-in user logic
   const [userId, setUserId] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
-useEffect(() => {
-  const getUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      setUserId(user.id);
-    }
-  };
-  getUser();
-}, []);
 
-  const receiverId = uploader_id; // The uploader (finder) of the item
+  const flatListRef = useRef<FlatList<any>>(null);
 
-  // ✅ Fetch messages from Supabase
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserId(user.id);
+      }
+    };
+    getUser();
+  }, []);
+
+  const receiverId = uploader_id;
+
   useEffect(() => {
     if (!claim_id) return;
-  
+
     const fetchMessages = async () => {
       const { data, error } = await supabase
         .from("chats")
         .select("*")
         .eq("claim_id", claim_id)
         .order("created_at", { ascending: true });
-  
+
       if (error) {
         console.error("Error fetching messages:", error.message);
       } else {
         setMessages(data);
       }
     };
-  
+
     fetchMessages();
-  
-    // Real-time subscription for new messages
+
     const subscription = supabase
       .channel(`chats:claim_id=${claim_id}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "chats", filter: `claim_id=eq.${claim_id}` }, (payload) => {
-        // Ensure we don't duplicate the message based on 'created_at' timestamp
         setMessages((prevMessages) => {
           const isDuplicate = prevMessages.some((msg) => msg.created_at === payload.new.created_at);
           if (!isDuplicate) {
@@ -94,29 +88,27 @@ useEffect(() => {
       supabase.removeChannel(subscription);
     };
   }, [claim_id]);
-  
 
-  // ✅ Handle sending messages
   const handleSend = async () => {
     if (inputText.trim() === "" || !userId) return;
-  
+
     let finalReceiverId = receiverId;
-  
+
     if (userId === receiverId) {
       const { data, error } = await supabase
         .from("claims")
         .select("user_id")
         .eq("claim_id", claim_id)
         .single();
-  
+
       if (error) {
         console.error("Error fetching claim user_id:", error.message);
         return;
       }
-  
+
       finalReceiverId = data?.user_id ?? receiverId;
     }
-  
+
     const newMessage = {
       claim_id,
       sender_id: userId,
@@ -124,92 +116,45 @@ useEffect(() => {
       message: inputText,
       created_at: new Date().toISOString(),
     };
-  
-    setInputText(""); // ✅ Clear input immediately
-  
+
+    setInputText(""); // Clear input immediately
+
     const { error } = await supabase.from("chats").insert([newMessage]);
-  
+
     if (error) {
       console.error("Error sending message:", error.message);
       Alert.alert("Failed to send message. Try again.");
     }
   };
-  
-  
-
-  useEffect(() => {
-    if (!userId) return;
-  
-    const fetchMessages = async () => {
-      const { data, error } = await supabase
-        .from("chats")
-        .select("*")
-        .eq("claim_id", claim_id)
-        .order("created_at", { ascending: true });
-  
-      if (error) {
-        console.error("Error fetching messages:", error.message);
-      } else {
-        setMessages(data);
-      }
-    };
-  
-    fetchMessages();
-  
-    const subscription = supabase
-      .channel(`chats:claim_id=${claim_id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "chats",
-          filter: `claim_id=eq.${claim_id}`,
-        },
-        (payload) => {
-          setMessages((prev) => [...prev, payload.new]);
-        }
-      )
-      .subscribe();
-  
-    return () => {
-      supabase.removeChannel(subscription);
-    };
-  }, [claim_id, userId]);
-  
-  
 
   const handleApprove = async () => {
     if (!claim_id || !userId) return;
-  
+
     try {
-      // Update the claim status to "approved"
       let { error: claimError } = await supabase
         .from("claims")
         .update({ status: "approved" })
         .eq("claim_id", claim_id);
-  
+
       if (claimError) throw claimError;
-  
-      // Find the item_id related to the claim
+
       let { data: claimData, error: claimFetchError } = await supabase
         .from("claims")
         .select("item_id")
         .eq("claim_id", claim_id)
         .single();
-  
+
       if (claimFetchError || !claimData) throw claimFetchError;
-  
+
       const itemId = claimData.item_id;
-  
-      // Set item status to "return_pending"
+
       let { error: itemError } = await supabase
         .from("found_items")
         .update({ status: "return_pending" })
         .eq("item_id", itemId);
-  
+
       if (itemError) throw itemError;
-  
+
       alert("Claim approved! Proceed with returning the item.");
     } catch (error: any) {
       console.error("Error approving claim:", error.message);
@@ -217,34 +162,13 @@ useEffect(() => {
     }
   };
 
-  const flatListRef = useRef<FlatList<any>>(null);
-
   useEffect(() => {
     if (messages.length > 0) {
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100); // Small delay ensures UI update happens first
+      }, 100);
     }
   }, [messages]);
-  
-
-<FlatList
-  ref={flatListRef}
-  data={messages}
-  keyExtractor={(item) => item.chat_id?.toString() || item.created_at}
-  renderItem={({ item }) => (
-    <View
-      style={[
-        styles.messageBubble,
-        item.sender_id === userId ? styles.myMessage : styles.theirMessage,
-      ]}
-    >
-      <Text style={styles.messageText}>{item.message}</Text>
-    </View>
-  )}
-  contentContainerStyle={{ paddingVertical: 20 }}
-/>;
-
 
   return (
     <View style={styles.container}>
@@ -255,37 +179,33 @@ useEffect(() => {
         <Text style={styles.headerTitle}>Chat about {item_name}</Text>
       </View>
 
-      
-
-
       <FlatList
-      data={messages}
-      keyExtractor={(item) => item.chat_id?.toString() || Math.random().toString()}
-      renderItem={({ item }) => (
-        <View
-          style={[
-            styles.messageBubble,
-            item.sender_id === userId ? styles.myMessage : styles.theirMessage,
-          ]}
-        >
-          <Text style={styles.messageText}>{item.message}</Text>
-        </View>
-      )}
-      contentContainerStyle={{ paddingVertical: 20 }}
-    />
+        ref={flatListRef}
+        data={messages}
+        keyExtractor={(item) => item.chat_id?.toString() || Math.random().toString()}
+        renderItem={({ item }) => (
+          <View
+            style={[
+              styles.messageBubble,
+              item.sender_id === userId ? styles.myMessage : styles.theirMessage,
+            ]}
+          >
+            <Text style={styles.messageText}>{item.message}</Text>
+          </View>
+        )}
+        contentContainerStyle={{ paddingVertical: 20 }}
+      />
 
-    {userId === uploader_id && (
+      {userId === uploader_id && (
         <TouchableOpacity
           style={styles.approveButton}
-          onPress={() => setModalVisible(true)} // ✅ Show modal on button press
+          onPress={() => setModalVisible(true)} // Show modal on button press
         >
           <Text style={{ color: "#fff", fontWeight: "bold" }}>Approve Claim</Text>
         </TouchableOpacity>
       )}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={80}
-      >
+
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={80}>
         <View style={styles.inputContainer}>
           <TextInput
             placeholder="Type a message..."
@@ -299,12 +219,7 @@ useEffect(() => {
         </View>
       </KeyboardAvoidingView>
 
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
+      <Modal animationType="slide" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Confirm Approval</Text>
@@ -331,8 +246,6 @@ useEffect(() => {
         </View>
       </Modal>
     </View>
-
-    
   );
 };
 
@@ -398,27 +311,42 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.5)", // Semi-transparent background
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
   modalContent: {
-    backgroundColor: "white",
+    backgroundColor: "#fff",
     padding: 20,
     borderRadius: 10,
     width: "80%",
     alignItems: "center",
   },
-  modalTitle: { fontSize: 20, fontWeight: "bold", marginBottom: 10 },
-  modalText: { fontSize: 16, textAlign: "center", marginBottom: 20 },
-  modalButtons: { flexDirection: "row", justifyContent: "space-around", width: "100%" },
-  modalButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 5,
-    marginHorizontal: 10,
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 10,
   },
-  cancelButton: { backgroundColor: "gray" },
-  approveModalButton: { backgroundColor: "green" },
-  
+  modalText: {
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    justifyContent: "space-evenly",
+    width: "100%",
+  },
+  modalButton: {
+    padding: 10,
+    borderRadius: 5,
+    width: "45%",
+    alignItems: "center",
+  },
+  cancelButton: {
+    backgroundColor: "#ccc",
+  },
+  approveModalButton: {
+    backgroundColor: "green",
+  },
 });
 
 export default ChatScreen;

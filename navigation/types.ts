@@ -8,19 +8,17 @@ export type RootStackParamList = {
   Login: undefined;
   Upload: undefined;
   Notification: undefined;
-  Chat: { uploader_id: string; item_name: string };
+  Chat: { claim_id: number; user_id: number; uploader_id: number; item_name: string }; // add user_id here if it's needed
   Account: undefined;
-  FoundItemDetails: {item: any };
+  FoundItemDetails: { item: any };
   LostItemDetails: { item: any };
   TransactionPage: undefined;
-  TransactionScreen: {claim: any}
   ClaimedItems: undefined;
   ClaimDetailsScreen: { claim: any; incoming: boolean };
   ListOfCategorizedItems: { title: string };
-  
 
-  ChatScreen: { uploader_id: string; item_name: string; claim_id: string };
-
+  // Updated ChatScreen to include user_id
+  ChatScreen: { claim_id: string; user_id: string; uploader_id: string; item_name: string }; // add user_id here
 };
 
 // Type for navigation prop

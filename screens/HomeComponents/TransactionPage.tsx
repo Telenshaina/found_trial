@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from "react-native";
-import { useNavigation, useFocusEffect, } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../navigation/types";
 import { supabase } from "../../supabase";
@@ -123,8 +123,8 @@ const TransactionPage: React.FC = () => {
   return (
     <View style={styles.container}>
       <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color="black" />
-            </TouchableOpacity>
+        <Text style={styles.backText}>← Back</Text>
+      </TouchableOpacity>
       <Text style={styles.title}>Your Claims</Text>
 
       {loading ? (
@@ -137,8 +137,13 @@ const TransactionPage: React.FC = () => {
             <TouchableOpacity
               key={tx.claim_id}
               style={styles.transactionCard}
-              onPress={() =>
-                navigation.navigate("ClaimDetailsScreen", { claim: tx, incoming: false })
+              onPress={() => 
+                navigation.navigate("Chat", {
+                  claim_id: tx.claim_id,
+                  user_id: tx.user_id,
+                  uploader_id: tx.uploader_id,
+                  item_name: tx.item_name,
+                })
               }
             >
               <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
@@ -187,8 +192,6 @@ const TransactionPage: React.FC = () => {
     </View>
   );
 };
-
-
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, backgroundColor: "#fff" },

@@ -117,7 +117,7 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
 
   // Function to submit proof
   const handleSubmitProof = async () => {
-    let newErrors = { name: "", email: "", phone: "", identifyingInfo: "" ,pickupLocation: ""};
+    let newErrors = { name: "", email: "", phone: "", identifyingInfo: "", pickupLocation: "" };
   
     if (!proofData.name) newErrors.name = "Full name is required";
     if (!proofData.email) newErrors.email = "Email is required";
@@ -132,7 +132,7 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
   
     let proofUrl = null;
   
-    //  Upload image only if an image is selected
+    // Upload image only if an image is selected
     if (proofImage) {
       try {
         const response = await fetch(proofImage);
@@ -160,8 +160,7 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
         return;
       }
     }
-    
-    
+  
     // Insert proof details into Supabase
     const { error } = await supabase
       .from('claims')
@@ -173,20 +172,56 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
           description: proofData.identifyingInfo,
           pickup_location: proofData.pickupLocation,
           status: 'pending',
-          
         },
       ]);
-  
-    setIsSubmitting(false);
   
     if (error) {
       console.error('Error submitting proof:', error);
       alert('Failed to submit proof.');
+      setIsSubmitting(false);
+      return;
+    }
+  
+    // Add notification to the notifications table
+    const { data: foundItemData, error: foundItemError } = await supabase
+      .from('found_items')
+      .select('found_by')
+      .eq('item_id', item.item_id)
+      .single();
+  
+    if (foundItemError) {
+      console.error('Error fetching found item details:', foundItemError);
+      alert('Failed to fetch found item details for notification.');
+      setIsSubmitting(false);
+      return;
+    }
+  
+    const receiverId = foundItemData.found_by; // The user who found the item
+  
+    // Insert a new notification into the notifications table
+    const { error: notificationError } = await supabase
+      .from('notifications')
+      .insert([
+        {
+          receiver_id: receiverId,
+          sender_id: authUserId,
+          item_id: item.item_id,
+          message: `A user has submitted proof of ownership for the item "${item.item_name}".`,
+          read: false,
+        },
+      ]);
+  
+    if (notificationError) {
+      console.error('Error inserting notification:', notificationError);
+      alert('Failed to send notification.');
     } else {
       alert('Proof submitted successfully! The owner will review your request.');
-      setProofModalVisible(false);
     }
+  
+    setIsSubmitting(false);
+    setProofModalVisible(false);
   };
+  
   
   
 

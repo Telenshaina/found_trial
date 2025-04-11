@@ -6,6 +6,11 @@ import { supabase } from "../supabase";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
+import {
+  GoogleSignin,
+  GoogleSigninButton,
+  statusCodes,
+} from '@react-native-google-signin/google-signin';
 
 interface RootStackParamList extends Record<string, object | undefined> {
   Login: undefined;
@@ -102,12 +107,16 @@ const InstitutionalLogin: React.FC = () => {
   const handleGoogleSignIn = async () => {
     setLoading(true);
     try {
-      const redirectUri = AuthSession.makeRedirectUri({
-        native: "found-neu-1://",
-      });
+     // const redirectUri = AuthSession.makeRedirectUri();
+      const redirectUri = "https://auth.expo.io/@keltnexus/foundneu";
 
+      console.log("Redirect URI:", redirectUri);  // Check the printed URI
+
+
+
+      // Step 1: Start OAuth sign-in with Supabase
       const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
+        provider: 'google',
         options: {
           redirectTo: redirectUri,
         },
@@ -116,8 +125,20 @@ const InstitutionalLogin: React.FC = () => {
       if (error) throw error;
 
       if (data?.url) {
-        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
-        console.log("Browser result:", result);
+        console.log("[DEBUG] Opening browser session");
+
+        // Step 2: Open the OAuth session in the browser
+        const result = await WebBrowser.openAuthSessionAsync(
+          data.url,
+          redirectUri,
+          { preferEphemeralSession: false }
+        );
+        
+        // Step 3: Check if the result is successful and handle it
+        if (result.type === "success" && result.url) {
+          // Authentication process is handled automatically, so no need to manually get the session
+          console.log('Authentication successful, session will be managed automatically');
+        }
       }
     } catch (error) {
       console.error("Login Error:", error);
@@ -126,6 +147,7 @@ const InstitutionalLogin: React.FC = () => {
       setLoading(false);
     }
   };
+
 
   return (
     <View style={styles.loginContainer}>

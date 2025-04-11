@@ -1,13 +1,13 @@
 {
   "expo": {
-    "scheme": "found-neu-1",
+    "scheme": "foundneu",
     "platforms": [
       "ios",
       "android",
       "web"
     ],
-    "name": "found-neu-1",
-    "slug": "found-neu-1",
+    "name": "foundneu",
+    "slug": "foundneu",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -19,34 +19,49 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.kelt.foundneu",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
-      
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.kelt.foundneu1"
+      "package": "com.kelt.foundneu"
     },
     "web": {
       "favicon": "./assets/neu-logo.png"
     },
     "intentFilters": [
-        {
-          "action": "VIEW",
-          "data": {
-            "scheme": "found-neu-1", 
-            "host": "auth"
-          },
-          "category": ["BROWSABLE", "DEFAULT"]
-        }
-      ],
+      {
+        "action": "VIEW",
+        "data": {
+          "scheme": "foundneu",
+          "host": "auth"
+        },
+        "category": [
+          "BROWSABLE",
+          "DEFAULT"
+        ]
+      }
+    ],
     "extra": {
       "eas": {
-        "projectId": "c59241e8-b450-455d-a83b-3f54c255d7ed"
+        "projectId": "7faffc61-ba2f-43e9-aeab-dda2923d60d7"
       }
-    }
-    
+    },
+    "owner": "keltnexus",
+    "plugins": [
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.924886088145-4go4tk97ljv2k0legh28vouq1t5vv093"
+        }
+      ]
+      
+    ]
   }
 }

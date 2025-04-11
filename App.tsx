@@ -3,7 +3,6 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import BottomTabNavigator from "./navigation/BottomTabNavigator";
 import Login from "./screens/Login";
-import Setup from "./screens/Setup";
 import SearchScreen from "./screens/HomeComponents/SearchScreen";
 import FoundItemDetails from "./screens/HomeComponents/FoundItemDetailsScreen";
 import LostItemDetails from "./screens/HomeComponents/LostItemDetailsScreen";
@@ -56,7 +55,6 @@ const App = () => {
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="AuthChecker" component={AuthChecker} /> 
         <Stack.Screen name="Login" component={Login} />
-        <Stack.Screen name="Setup" component={Setup} />
         <Stack.Screen name="Main" component={BottomTabNavigator} />
         <Stack.Screen name="SearchScreen" component={SearchScreen} />
         <Stack.Screen 

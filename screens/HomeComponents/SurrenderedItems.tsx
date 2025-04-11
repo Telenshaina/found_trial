@@ -15,7 +15,11 @@ type RootStackParamList = {
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'FoundItemDetails'>;
 
-const SurrenderedItems = () => {
+type Props = {
+  disabled?: boolean;
+};
+
+const SurrenderedItems: React.FC<Props> = ({ disabled }) => {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const navigation = useNavigation<NavigationProp>();

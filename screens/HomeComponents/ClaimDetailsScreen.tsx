@@ -166,6 +166,9 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
       uploader_id: claim.found_by,
       item_name: claim.item_name,
       claim_id: claim.claim_id,
+      user_id: claim.user_id,
+
+      
     });
   };
 

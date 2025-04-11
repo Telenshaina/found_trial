@@ -63,52 +63,63 @@ const Login: React.FC = () => (
 const InstitutionalLogin: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const [loading, setLoading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user?.email?.endsWith("@neu.edu.ph")) {
         const { id: userId, email, user_metadata } = session.user;
-        const name = user_metadata.full_name;
-  
-        // Check if user is banned in institutional_users
+        const name = user_metadata?.full_name || "Institutional User";
+
+        // Fetch institutional user info
         const { data: user, error } = await supabase
           .from("institutional_users")
-          .select("status")
+          .select("*")
           .eq("id", userId)
           .single();
-  
+
         if (error) {
-          console.error("Error fetching user status:", error.message);
+          console.error("Error fetching user info:", error.message);
           return;
         }
-  
+
+        // Check if banned
         if (user?.status === "banned") {
           Alert.alert(
             "You are banned",
             "If you think this is a mistake, please contact an admin."
           );
-          await supabase.auth.signOut(); 
+          await supabase.auth.signOut();
           return;
         }
-  
+
+        // Log login activity
         await logUserActivity(userId, name, email, "login", "Institutional");
-        navigation.replace("Main");
+
+        // Check for missing details
+        if (!user.phone_number || !user.student_number) {
+          setShowModal(true); // Show modal if info is incomplete
+        } else {
+          navigation.replace("Main"); // Navigate if info is complete
+        }
+
       } else if (session) {
-        Alert.alert("Unauthorized", "Only institutional accounts can log in on this tab. Try logging in as a guest.");
+        // Non-institutional user tried to log in
+        Alert.alert("Unauthorized", "Only institutional accounts can log in here. Try the Guest tab.");
         supabase.auth.signOut();
       }
     });
-  
+
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, []);  
+  }, []);
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
     try {
-     // const redirectUri = AuthSession.makeRedirectUri();
-      const redirectUri = "https://auth.expo.io/@keltnexus/foundneu";
+      const redirectUri = AuthSession.makeRedirectUri();
+     // const redirectUri = "https://auth.expo.io/@keltnexus/foundneu";
 
       console.log("Redirect URI:", redirectUri);  // Check the printed URI
 

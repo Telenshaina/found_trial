@@ -13,8 +13,11 @@ type RootStackParamList = {
 };
 
 type NavigationProp = StackNavigationProp<RootStackParamList, "LostItemDetails">;
+type Props = {
+  disabled?: boolean;
+};
 
-const LostItems = () => {
+const LostItems: React.FC<Props> = ({ disabled }) => {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const navigation = useNavigation<NavigationProp>();

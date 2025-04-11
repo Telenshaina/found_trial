@@ -5,7 +5,11 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/types';
 
-const LastAccessed = () => {
+type Props = {
+  disabled?: boolean;
+};
+
+const LastAccessed: React.FC<Props> = ({ disabled }) => {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
   const [lastAccessed, setLastAccessed] = useState<any | null>(null);

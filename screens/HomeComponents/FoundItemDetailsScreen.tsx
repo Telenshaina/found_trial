@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import {
-  View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, Modal, TextInput, Button, ActivityIndicator
-} from 'react-native';
+import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, Modal, TextInput, Button, ActivityIndicator } from 'react-native';
+import Icon from 'react-native-vector-icons/Feather';
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../../supabase';
+import EditItem from './EditItem';
 
 const FoundItemDetailsScreen = ({ route }: { route: any }) => {
-  const { item} = route.params;
+  const { item } = route.params;
   const navigation = useNavigation();
   
   const [foundByUser, setFoundByUser] = useState<string | null>(null);
@@ -16,6 +16,7 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
   const [isStatusModalVisible, setStatusModalVisible] = useState(false);
   const [proofImage, setProofImage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isEditModalVisible, setEditModalVisible] = useState(false);
   const [foundItemStatus, setFoundItemStatus] = useState<string | null>(null);
   const [proofData, setProofData] = useState({
     name: "",
@@ -29,6 +30,10 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
     email: "",
     phone: "",
     identifyingInfo: "",
+  });
+  const [editData, setEditData] = useState({
+    itemName: item.item_name,
+    description: item.description,
   });
 
   const isOwner = authUserId === item.found_by;
@@ -62,38 +67,39 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
     };
     fetchUser();
   }, [item.found_by]);
-
-
-    
-
-    // Fetch the status of the found item
-    useEffect(() => {
-      const fetchItemStatus = async () => {
-        const { data, error } = await supabase
-          .from('found_items')
-          .select('status')
-          .eq('item_id', item.item_id)
-          .single();
-
-        if (data) {
-          setFoundItemStatus(data.status);
-        }
-        if (error) {
-          console.error('Error fetching item status:', error);
-        }
-      };
-
-      fetchItemStatus();
+  
+  // Fetch the status of the found item
+  useEffect(() => {
+    const fetchItemStatus = async () => {
+      const { data, error } = await supabase
+        .from('found_items')
+        .select('status')
+        .eq('item_id', item.item_id)
+        .single();
+      
+      if (data) {
+        setFoundItemStatus(data.status);
+      }
+      if (error) {
+        console.error('Error fetching item status:', error);
+      }
+    };
+    fetchItemStatus();
     }, [item.item_id]);
-
-      const handleButtonPress = () => {
-        if (isOwner) {
-          setStatusModalVisible(true);
-        } else {
-          setProofModalVisible(true);
-        }
-      };
-
+  
+    const handleEditSubmit = () => {
+      alert('Edit functionality is still in the works.');
+      setEditModalVisible(false);
+    };
+       
+  const handleButtonPress = () => {
+    if (isOwner) {
+      setStatusModalVisible(true);
+    } else {
+      setProofModalVisible(true);
+    }
+  };
+  
   // Function to pick an image for proof submission
   const handlePickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -112,8 +118,6 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
       setProofImage(result.assets[0].uri);
     }
   };
- 
-
 
   // Function to submit proof
   const handleSubmitProof = async () => {
@@ -129,9 +133,8 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
     if (Object.values(newErrors).some((error) => error !== "")) return;
   
     setIsSubmitting(true);
-  
     let proofUrl = null;
-  
+
     // Upload image only if an image is selected
     if (proofImage) {
       try {
@@ -151,7 +154,6 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
           setIsSubmitting(false);
           return;
         }
-  
         proofUrl = supabase.storage.from('proofs').getPublicUrl(fileName).data.publicUrl;
       } catch (error) {
         console.error('Error converting image to Blob:', error);
@@ -217,14 +219,10 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
     } else {
       alert('Proof submitted successfully! The owner will review your request.');
     }
-  
     setIsSubmitting(false);
     setProofModalVisible(false);
   };
   
-  
-  
-
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -253,7 +251,6 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
                 : "Loading..."}
             </Text>
           </View>
-
         </View>
 
         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
@@ -264,16 +261,19 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
           <View style={styles.guestTag}>
             <Text style={styles.guestTagText}>Guest</Text>
           </View>
-)}
-
-          
+          )}
         </View>
-
 
         <View style={styles.badgeContainer}>
           <View style={styles.categoryBadge}>
             <Text style={styles.categoryText}>Category: {item.category}</Text>
           </View>
+          {isOwner && (
+            <TouchableOpacity style={styles.editButton} onPress={() => setEditModalVisible(true)}>
+              <Text style={styles.editButtonText}>
+                <Icon name='edit' size={14} color='#007bff' />  Edit Item</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={styles.imageContainer}>
@@ -297,34 +297,32 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
 
       {/* Fixed Bottom Button */}
       <View style={styles.bottomButtonContainer}>
-  {isOwner && <Text style={styles.ownerNote}>This is your item</Text>}
-
-  {foundItemStatus?.toLowerCase() === "claimed" ? (
-    // If the item is claimed, check if the current user is the one who claimed it
-    item.claimed_by === authUserId ? (
-      <Text style={styles.claimedText}>You claimed this item</Text>
-    ) : (
-      <TouchableOpacity
-        style={styles.claimButton}
-        onPress={() => {
-          // Logic for filing a claim report goes here
-          alert("Filing a Claim Report...");
-        }}
-      >
-        <Text style={styles.claimButtonText}>File a Claim Report</Text>
-      </TouchableOpacity>
-    )
-  ) : (
-    // If the item is not claimed, show the claim button
-    <TouchableOpacity style={styles.claimButton} onPress={handleButtonPress}>
-      <Text style={styles.claimButtonText}>
-        {isOwner ? 'Check Status' : 'Claim Item'}
-      </Text>
-    </TouchableOpacity>
-  )}
-</View>
-
-
+        {isOwner && <Text style={styles.ownerNote}>This is your item</Text>}
+        
+        {foundItemStatus?.toLowerCase() === "claimed" ? (
+          // If the item is claimed, check if the current user is the one who claimed it
+          item.claimed_by === authUserId ? (
+            <Text style={styles.claimedText}>You claimed this item</Text>
+          ) : (
+            <TouchableOpacity
+              style={styles.claimButton}
+              onPress={() => {
+              // Logic for filing a claim report goes here
+              alert("Filing a Claim Report...");
+              }}
+            >
+              <Text style={styles.claimButtonText}>File a Claim Report</Text>
+            </TouchableOpacity>
+          )
+        ) : (
+          // If the item is not claimed, show the claim button
+          <TouchableOpacity style={styles.claimButton} onPress={handleButtonPress}>
+            <Text style={styles.claimButtonText}>
+              {isOwner ? 'Check Status' : 'Claim Item'}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
       {/* Proof Submission Modal */}
       <Modal visible={isProofModalVisible} animationType="slide" transparent>
@@ -382,14 +380,14 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
             onChangeText={(text) => setProofData({ ...proofData, pickupLocation: text })}
           />
           <TouchableOpacity onPress={handlePickImage} style={[styles.button, { marginVertical: 10 }]}>
-              <Text style={styles.buttonText}>
-                {proofImage ? 'Change Uploaded Image' : 'Optional: Upload Image'}
-              </Text>
-            </TouchableOpacity>
+            <Text style={styles.buttonText}>
+              {proofImage ? 'Change Uploaded Image' : 'Optional: Upload Image'}
+            </Text>
+          </TouchableOpacity>
 
-            {proofImage && (
-              <Image source={{ uri: proofImage }} style={{ width: '100%', height: 150, borderRadius: 8, marginBottom: 10 }} />
-            )}
+          {proofImage && (
+            <Image source={{ uri: proofImage }} style={{ width: '100%', height: 150, borderRadius: 8, marginBottom: 10 }} />
+          )}
 
           {/* Buttons */}
           <View style={styles.buttonContainer}>
@@ -404,27 +402,32 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
       </View>
     </Modal>
 
-
-
-      {/* Check Status Modal */}
-      <Modal visible={isStatusModalVisible} animationType="fade" transparent>
-        <View style={styles.modalContainer}>
-          <View style={styles.statusModalContent}>
-            <Text style={styles.modalTitle}>Item Status</Text>
-            <Text style={styles.statusText}>Your uploaded item is currently being processed.</Text>
-            <Text style={styles.statusText}>No one has claimed the Item you have uploaded</Text>
-            <Text style={styles.infoText}>Check back later for updates.</Text>
-            <Button title="Close" onPress={() => setStatusModalVisible(false)} />
-          </View>
+    {/* Check Status Modal */}
+    <Modal visible={isStatusModalVisible} animationType="fade" transparent>
+      <View style={styles.modalContainer}>
+        <View style={styles.statusModalContent}>
+          <Text style={styles.modalTitle}>Item Status</Text>
+          <Text style={styles.statusText}>Your uploaded item is currently being processed.</Text>
+          <Text style={styles.statusText}>No one has claimed the Item you have uploaded</Text>
+          <Text style={styles.infoText}>Check back later for updates.</Text>
+          <Button title="Close" onPress={() => setStatusModalVisible(false)} />
         </View>
-      </Modal>
-    </View>
+      </View>
+    </Modal>
+    
+    {/* Edit Item Modal */}
+    <EditItem
+      visible={isEditModalVisible}
+      onClose={() => setEditModalVisible(false)}
+      onSubmit={handleEditSubmit}
+      editData={editData}
+      setEditData={setEditData} />
+  </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
-
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -435,9 +438,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   headerTitle: { marginLeft: 10, fontSize: 18, fontWeight: 'bold', color: '#DC2626' },
-
   content: { paddingHorizontal: 16, paddingBottom: 100 },
-
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 20 },
   itemName: { fontSize: 20, fontWeight: 'bold' },
   unclaimedBadge: { backgroundColor: '#FCE7F3', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
@@ -452,7 +453,6 @@ const styles = StyleSheet.create({
     color: "#065F46", // Dark green text
     fontWeight: "bold",
   },
-  
   postedBy: { fontSize: 12, color: '#6B7280', marginTop: 4 },
   guestTag: {
     backgroundColor: '#FFD700',
@@ -463,16 +463,18 @@ const styles = StyleSheet.create({
   },
   guestTagText: {
     color: '#333',
-    
     fontWeight: 'bold',
     fontSize: 10,
   },
-  
-
-  badgeContainer: { flexDirection: 'row', marginTop: 8 },
+  label: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 4,
+    color: '#333',
+  },
+  badgeContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 },
   categoryBadge: { backgroundColor: '#EDE9FE', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
   categoryText: { fontSize: 12, color: '#5B21B6', fontWeight: 'bold' },
-
   imageContainer: {
     backgroundColor: '#E5E7EB',
     width: '100%',
@@ -482,15 +484,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 16,
   },
-  image: { width: '100%', height: '100%', borderRadius: 12 },
-
+  image: { width: '100%', height: '100%', borderRadius: 12, resizeMode: 'contain' },
   section: { marginTop: 16 },
   sectionTitle: { fontSize: 16, fontWeight: 'bold' },
   dateText: { fontSize: 14, color: '#6B7280', marginTop: 4 },
-
   descriptionBox: { backgroundColor: '#F3F4F6', padding: 12, borderRadius: 8, marginTop: 4 },
   descriptionText: { fontSize: 14, color: '#4B5563' },
-
   bottomButtonContainer: {
     position: 'absolute',
     bottom: 0,
@@ -504,11 +503,8 @@ const styles = StyleSheet.create({
   ownerNote: { fontSize: 14, color: '#059669', fontWeight: 'bold', textAlign: 'center', marginBottom: 8 },
   claimButton: { backgroundColor: '#000', paddingVertical: 14, borderRadius: 8, alignItems: 'center' },
   claimButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-
- 
   statusText: { fontSize: 16, marginVertical: 10, textAlign: 'center' },
   infoText: { fontSize: 14, color: '#6B7280', marginBottom: 10, textAlign: 'center' }, // Add this line
-  
   statusModalContent: {
     backgroundColor: 'white',
     padding: 20,
@@ -582,6 +578,8 @@ const styles = StyleSheet.create({
   errorInput: {
     borderColor: "red",
   },
+  editButton: { backgroundColor: '#e1eefc', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, marginLeft: 'auto', },
+  editButtonText: { fontSize: 12, color: '#007bff', fontWeight: 'bold' },
 });
 
 export default FoundItemDetailsScreen;

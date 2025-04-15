@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, useWindowDimensions } from "react-native";
+import { TabView, SceneMap, TabBar } from "react-native-tab-view";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../navigation/types";
@@ -10,20 +11,22 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList, "Transaction
 
 const TransactionPage: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
+  const layout = useWindowDimensions();
   const [userClaims, setUserClaims] = useState<any[]>([]);
   const [incomingClaims, setIncomingClaims] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [index, setIndex] = useState(0);
+  const [routes] = useState([
+    { key: "userClaims", title: "Your Claims" },
+    { key: "incomingClaims", title: "Incoming Claims" },
+  ]);
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
-      case "approved":
-        return "#4CAF50";
-      case "rejected":
-        return "#FF4C4C";
-      case "pending":
-        return "#FFA500";
-      default:
-        return "#888";
+      case "approved": return "#4CAF50";
+      case "rejected": return "#FF4C4C";
+      case "pending": return "#FFA500";
+      default: return "#888";
     }
   };
 
@@ -65,10 +68,8 @@ const TransactionPage: React.FC = () => {
             if (uploadError) {
             console.error("Error fetching uploaded items:", uploadError);
             }
-
-            const itemsUploaded = itemsUploadedRaw ?? [];
-
-
+    
+    const itemsUploaded = itemsUploadedRaw ?? [];
     const itemIds = itemsUploaded?.map((item) => item.item_id) || [];
 
     if (itemIds.length > 0) {
@@ -82,12 +83,10 @@ const TransactionPage: React.FC = () => {
         const item = itemsUploaded.find((item) => item.item_id === claim.item_id);
         return { ...claim, item_name: item?.item_name || "Unknown Item" };
       });
-
       setIncomingClaims(incomingClaimsWithNames);
     } else {
       setIncomingClaims([]);
     }
-
     setLoading(false);
   };
 
@@ -120,75 +119,86 @@ const TransactionPage: React.FC = () => {
     }, [])
   );
 
-  return (
-    <View style={styles.container}>
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-        <Text style={styles.backText}>← Back</Text>
-      </TouchableOpacity>
-      <Text style={styles.title}>Your Claims</Text>
-
-      {loading ? (
-        <ActivityIndicator size="large" color="#007AFF" />
-      ) : userClaims.length === 0 ? (
-        <Text style={styles.noTransactions}>No claims found.</Text>
-      ) : (
-        <ScrollView>
-          {userClaims.map((tx) => (
-            <TouchableOpacity
-              key={tx.claim_id}
-              style={styles.transactionCard}
-              onPress={() => 
-                navigation.navigate("Chat", {
-                  claim_id: tx.claim_id,
-                  user_id: tx.user_id,
-                  uploader_id: tx.uploader_id,
-                  item_name: tx.item_name,
-                })
-              }
-            >
+  const renderUserClaims = () => (
+    loading ? <ActivityIndicator size="large" color="#007AFF" /> : userClaims.length === 0 ? (
+      <Text style={styles.noTransactions}>No claims found.</Text>
+    ) : (
+      <ScrollView style={styles.tabContent}>
+        {userClaims.map((tx) => (
+          <TouchableOpacity key={tx.claim_id} style={styles.transactionCard}
+            onPress={() =>
+              navigation.navigate("Chat", {
+                claim_id: tx.claim_id, 
+                user_id: tx.user_id, 
+                uploader_id: tx.uploader_id, 
+                item_name: tx.item_name,
+              })
+            }>
               <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                 <Text style={styles.txTitle}>{tx.item_name}</Text>
                 <TouchableOpacity onPress={() => handleDelete(tx.claim_id)}>
                   <Ionicons name="trash-outline" size={20} color="#FF4C4C" />
                 </TouchableOpacity>
               </View>
+
               <View style={[styles.statusTag, { backgroundColor: getStatusColor(tx.status) }]}>
                 <Text style={styles.statusText}>{tx.status.toUpperCase()}</Text>
               </View>
               <Text>Date: {new Date(tx.created_at).toLocaleDateString()}</Text>
             </TouchableOpacity>
-          ))}
-        </ScrollView>
-      )}
+        ))}
+      </ScrollView>
+    )
+  );
 
-      <Text style={[styles.title, { marginTop: 30 }]}>Incoming Claims (Other users claiming your items)</Text>
-
-      {loading ? (
-        <ActivityIndicator size="large" color="#007AFF" />
-      ) : incomingClaims.length === 0 ? (
-        <Text style={styles.noTransactions}>No incoming claims found.</Text>
-      ) : (
-        <ScrollView>
-          {incomingClaims.map((claim) => (
-            <TouchableOpacity
-              key={claim.claim_id}
-              style={styles.transactionCard}
-              onPress={() =>
-                navigation.navigate("ClaimDetailsScreen", { claim: claim, incoming: true })
-              }
-            >
-              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                <Text style={styles.txTitle}>{claim.item_name}</Text>
-              </View>
+  const renderIncomingClaims = () => (
+    loading ? <ActivityIndicator size="large" color="#007AFF" /> : incomingClaims.length === 0 ? (
+      <Text style={styles.noTransactions}>No incoming claims found.</Text>
+    ) : (
+      <ScrollView style={styles.tabContent}>
+        {incomingClaims.map((claim) => (
+          <TouchableOpacity key={claim.claim_id} style={styles.transactionCard}
+            onPress={() =>
+              navigation.navigate("ClaimDetailsScreen", { claim: claim, incoming: true })
+            }>
+              <Text style={styles.txTitle}>{claim.item_name}</Text>
               <View style={[styles.statusTag, { backgroundColor: getStatusColor(claim.status) }]}>
                 <Text style={styles.statusText}>{claim.status.toUpperCase()}</Text>
               </View>
               <Text>Claimed by: {claim.user_id}</Text>
               <Text>Date: {new Date(claim.created_at).toLocaleDateString()}</Text>
             </TouchableOpacity>
-          ))}
-        </ScrollView>
-      )}
+        ))}
+      </ScrollView>
+    )
+  );
+
+  const renderScene = SceneMap({
+    userClaims: renderUserClaims, 
+    incomingClaims: renderIncomingClaims,
+  });
+
+  return (
+    <View style={styles.container}>
+      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <Ionicons name='arrow-back' size={24} color='black' />
+      </TouchableOpacity>
+      
+      <TabView
+        navigationState={{ index, routes }}
+        renderScene={renderScene}
+        onIndexChange={setIndex}
+        initialLayout={{ width: layout.width }}
+        renderTabBar={(props) => (
+          <TabBar
+            {...props}
+            indicatorStyle={{ backgroundColor: 'black' }}
+            style={{ backgroundColor: 'white' }}
+            activeColor="black"
+            inactiveColor="gray"
+          />
+        )}
+      />
     </View>
   );
 };
@@ -198,7 +208,7 @@ const styles = StyleSheet.create({
   backButton: { marginBottom: 20 },
   backText: { fontSize: 16, color: "#007AFF" },
   title: { fontSize: 24, fontWeight: "bold", marginBottom: 20 },
-  noTransactions: { textAlign: "center", fontSize: 16, color: "#888", marginTop: 10 },
+  noTransactions: { textAlign: "center", fontSize: 16, color: "#888", marginTop: 15 },
   transactionCard: {
     backgroundColor: "#f0f0f0",
     padding: 15,
@@ -214,6 +224,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   statusText: { color: "#fff", fontWeight: "bold", fontSize: 12 },
+  tabContent: { padding: 20 },
+  tabLabel: { color: "#000", fontWeight: "bold", backgroundColor: "#f9f9f9" },
 });
 
 export default TransactionPage;

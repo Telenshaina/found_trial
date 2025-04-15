@@ -1,8 +1,15 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, FlatList, Image, SafeAreaView, TouchableOpacity, ActivityIndicator } from "react-native";
-import Header from './Header';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  SafeAreaView,
+} from "react-native";
+import Header from "./Header";
 import { useRoute, useNavigation } from "@react-navigation/native";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/types";
 import { supabase } from "../supabase";
 
@@ -49,6 +56,20 @@ const Chat = () => {
     setRecentChats((prevChats) => [newChat, ...prevChats]);
   };
 
+  const fetchMessagesForClaim = async (claim_id: string) => {
+    const { data: messages, error } = await supabase
+      .from("chats")
+      .select("*")
+      .eq("claim_id", claim_id);
+
+    if (error) {
+      console.error("Error fetching messages:", error);
+      return [];
+    }
+
+    return messages || [];
+  };
+
   const fetchTransactions = async () => {
     setLoading(true);
 
@@ -61,24 +82,26 @@ const Chat = () => {
 
     const { data: userClaimsData, error: userClaimsError } = await supabase
       .from("claims")
-      .select("*")
+      .select("*,  found_items(item_name)")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
     if (userClaimsError) {
       console.error("Error fetching user claims:", userClaimsError);
     } else {
-      const userClaimsWithNames = await Promise.all(
+      const userClaimsWithMessages = await Promise.all(
         (userClaimsData || []).map(async (claim) => {
-          const { data: itemData } = await supabase
-            .from("found_items")
-            .select("item_name")
-            .eq("item_id", claim.item_id)
-            .single();
-          return { ...claim, item_name: itemData?.item_name || "Unknown Item" };
+          const messages = await fetchMessagesForClaim(claim.claim_id.toString());
+          if (messages.length > 0) {
+            return {
+              ...claim,
+              messages,
+            };
+          }
+          return null;
         })
       );
-      setUserClaims(userClaimsWithNames);
+      setUserClaims(userClaimsWithMessages.filter((claim) => claim !== null));
     }
 
     const { data: itemsUploadedRaw, error: uploadError } = await supabase
@@ -100,12 +123,22 @@ const Chat = () => {
         .in("item_id", itemIds)
         .order("created_at", { ascending: false });
 
-      const incomingClaimsWithNames = (incomingClaimsData || []).map((claim) => {
-        const item = itemsUploaded.find((item) => item.item_id === claim.item_id);
-        return { ...claim, item_name: item?.item_name || "Unknown Item" };
-      });
+      const incomingClaimsWithMessages = await Promise.all(
+        (incomingClaimsData || []).map(async (claim) => {
+          const messages = await fetchMessagesForClaim(claim.claim_id.toString());
+          const item = itemsUploaded.find((item) => item.item_id === claim.item_id);
+          if (messages.length > 0) {
+            return {
+              ...claim,
+              item_name: item?.item_name || "Unknown Item", // default fallback
+              messages,
+            };
+          }
+          return null;
+        })
+      );
 
-      setIncomingClaims(incomingClaimsWithNames);
+      setIncomingClaims(incomingClaimsWithMessages.filter((claim) => claim !== null));
     } else {
       setIncomingClaims([]);
     }
@@ -119,57 +152,86 @@ const Chat = () => {
 
   const handleClaimPress = (claim: any) => {
     navigation.navigate("ChatScreen", {
-      claim_id: claim.claim_id.toString(),  // Ensure it's a string if required
-      user_id: params?.user_id,  // Assuming user_id comes from route params or some state
-      uploader_id: claim.uploader_id,  // Assuming uploader_id is part of the claim data
-      item_name: claim.item_name,  // Passing item name as well
+      claim_id: claim.claim_id.toString(),
+      user_id: params?.user_id,
+      uploader_id: claim.uploader_id,
+      item_name: claim.item_name || "General", // Fallback to "General" if undefined
     });
+  };
+
+  const getCardBackgroundColor = (status: string) => {
+    if (!status) return '#FFFFFF';
+    switch (status.trim().toLowerCase()) {
+      case 'pending':
+        return '#FFF3E0'; //yellow  
+      case 'approved':
+        return '#E8F5E9'; //green 
+      default:
+        return '#FFFFFF'; //white as def
+    }
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <Header />
-      <View style={styles.container}>
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Recent Chats</Text>
-          <FlatList
-            data={[...userClaims, ...incomingClaims]} // Combine both claims into one list
-            keyExtractor={(item) => item.claim_id.toString()}
-            renderItem={({ item }) => (
-              <TouchableOpacity onPress={() => handleClaimPress(item)}>
-                <View style={styles.transactionItem}>
-                  <Text style={styles.transactionText}>Claim ID: {item.claim_id}</Text>
-                  <Text style={styles.transactionText}>Item: {item.item_name}</Text>
-                  <Text style={styles.transactionText}>Status: {item.status}</Text>
+      <View style={styles.contentWrapper}>
+        <Text style={styles.sectionTitle}>Recent Chats</Text>
+        <FlatList
+          contentContainerStyle={{ paddingBottom: 30 }}
+          data={[...userClaims, ...incomingClaims]}
+          keyExtractor={(item) => item.claim_id.toString()}
+          renderItem={({ item }) => (
+            <TouchableOpacity onPress={() => handleClaimPress(item)}>
+              <View
+                style={[
+                  styles.transactionItem,
+                  { backgroundColor: getCardBackgroundColor(item.status) },
+                ]}
+              >
+                <View style={styles.itemRow}>
+                  <Text style={[styles.transactionText, styles.itemName]}>
+                    {item.item_name || "No item name available"} {/* Default value if missing */}
+                  </Text>
+                  <Text style={[styles.transactionText, styles.statusText]}>
+                    {item.status || "No status available"} {/* Default value if missing */}
+                  </Text>
                 </View>
-              </TouchableOpacity>
-            )}
-          />
-        </View>
+                <Text style={[styles.transactionText, { fontSize: 12 }]}>
+                  Claimer ID: {item.user_id || "N/A"}
+                </Text>
+                <Text style={[styles.transactionText, { fontSize: 12 }]}>
+                  {params?.user_id === item.user_id
+                    ? "You are the claimer"
+                    : "Wants to claim your item"}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          )}
+        />
       </View>
     </SafeAreaView>
   );
 };
 
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f0f0f0",
+  },
+  contentWrapper: {
+    flex: 1,
     paddingHorizontal: 20,
+    paddingTop: 10,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    marginVertical: 10,
+    marginBottom: 10,
     color: "#000000",
   },
-  card: {
-    marginBottom: 20,
-  },
   transactionItem: {
-    flexDirection: "row",
     padding: 15,
-    backgroundColor: "#fff",
     borderRadius: 10,
     marginBottom: 15,
     shadowColor: "#000",
@@ -181,6 +243,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#333",
     marginBottom: 5,
+  },
+  itemRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 5,
+  },
+  itemName: {
+    fontSize: 16,
+    fontWeight: "bold",
+    flexShrink: 1,
+  },
+  statusText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#444",
+    marginLeft: 10,
+    textTransform: "capitalize",
   },
 });
 

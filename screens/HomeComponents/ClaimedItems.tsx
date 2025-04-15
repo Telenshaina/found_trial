@@ -1,18 +1,38 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, useWindowDimensions } from "react-native";
+import Icon from 'react-native-vector-icons/Ionicons';
+import { TabView, SceneMap, TabBar } from "react-native-tab-view";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../navigation/types";
 import { supabase } from "../../supabase";
 
+type NavigationProp = NativeStackNavigationProp<RootStackParamList, "ClaimedItems">;
+
 const ClaimedItems: React.FC = () => {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList, "ClaimedItems">>();
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("allClaims");
+  const navigation = useNavigation<NavigationProp>();
+  const layout = useWindowDimensions();
   const [claimedItems, setClaimedItems] = useState<any[]>([]);
+  const [userClaimedItems, setUserClaimedItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [index, setIndex] = useState(0);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  const [routes] = useState([
+    { key: "allClaims", title: "All Claimed Items" }, 
+    { key: "yourClaims", title: "Your Claimed Items" },
+  ]);
 
   const fetchClaimedItems = async () => {
     setLoading(true);
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      console.error("User fetch error:", userError);
+      setLoading(false);
+      return;
+    }
+    setUserId(user.id);
+
     const { data, error } = await supabase
       .from("found_items")
       .select("*")
@@ -22,6 +42,7 @@ const ClaimedItems: React.FC = () => {
       console.error("Error fetching claimed items:", error);
     } else {
       setClaimedItems(data || []);
+      setUserClaimedItems((data || []).filter(item => item.claimer_id === user.id));
     }
     setLoading(false);
   };
@@ -32,41 +53,60 @@ const ClaimedItems: React.FC = () => {
     }, [])
   );
 
+  const renderClaimCard = (item: any) => (
+    <View key={item.id} style={styles.itemCard}>
+      <Text style={styles.itemTitle}>{item.item_name}</Text>
+      <Text>Status: {item.status}</Text>
+      <Text>Date Claimed: {new Date(item.claimed_at).toLocaleDateString()}</Text>
+    </View>
+  );
+
+  const renderAllClaims = () => (
+    loading ? <ActivityIndicator size="large" color="#007AFF" /> : claimedItems.length === 0 ? (
+      <Text style={styles.noItemsText}>No claimed items found.</Text>
+    ) : (
+      <ScrollView style={styles.tabContent}>
+        {claimedItems.map(renderClaimCard)}
+      </ScrollView>
+    )
+  );
+
+  const renderYourClaims = () => (
+    loading ? <ActivityIndicator size="large" color="#007AFF" /> : userClaimedItems.length === 0 ? (
+      <Text style={styles.noItemsText}>You haven't claimed any items.</Text>
+    ) : (
+      <ScrollView style={styles.tabContent}>
+        {userClaimedItems.map(renderClaimCard)}
+      </ScrollView>
+    )
+  );
+
+  const renderScene = SceneMap({
+    allClaims: renderAllClaims, 
+    yourClaims: renderYourClaims,
+  });
+
   return (
     <View style={styles.container}>
       <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-        <Text style={styles.backText}>← Back</Text>
+        <Icon name='arrow-back' size={24} color='black' />
       </TouchableOpacity>
-      
-      <View style={styles.tabsContainer}>
-      <TouchableOpacity
-          style={[styles.tab, activeTab === "allClaims" && styles.activeTab]}
-          onPress={() => setActiveTab("allClaims")}
-        >
-          <Text style={styles.tabText}>All Claimed Items</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === "yourClaims" && styles.activeTab]}
-          onPress={() => setActiveTab("yourClaims")}
-        >
-          <Text style={styles.tabText}>Your Claimed Items</Text>
-        </TouchableOpacity>
-        
-      </View>
 
-      {loading ? (
-        <ActivityIndicator size="large" color="#007AFF" />
-      ) : (
-        <ScrollView>
-          {activeTab === "allClaims" && claimedItems.map((item) => (
-            <View key={item.id} style={styles.itemCard}>
-              <Text style={styles.itemTitle}>{item.item_name}</Text>
-              <Text>Status: {item.status}</Text>
-              <Text>Date Claimed: {new Date(item.claimed_at).toLocaleDateString()}</Text>
-            </View>
-          ))}
-        </ScrollView>
-      )}
+      <TabView
+        navigationState={{ index, routes }}
+        renderScene={renderScene} 
+        onIndexChange={setIndex} 
+        initialLayout={{ width: layout.width}}
+        renderTabBar={(props) => (
+          <TabBar
+            {...props}
+            indicatorStyle={{ backgroundColor: 'black' }}
+            style={{ backgroundColor: 'white' }}
+            activeColor="black"
+            inactiveColor="gray"
+          />
+        )}
+      />
     </View>
   );
 };
@@ -75,12 +115,10 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, backgroundColor: "#fff" },
   backButton: { marginBottom: 20 },
   backText: { fontSize: 16, color: "#007AFF" },
-  tabsContainer: { flexDirection: "row", marginBottom: 10 },
-  tab: { flex: 1, padding: 10, alignItems: "center", borderBottomWidth: 2, borderBottomColor: "#ccc" },
-  activeTab: { borderBottomColor: "#007AFF" },
-  tabText: { fontSize: 16, fontWeight: "bold" },
+  tabContent: { padding: 20 },
   itemCard: { backgroundColor: "#f0f0f0", padding: 15, borderRadius: 10, marginBottom: 10 },
-  itemTitle: { fontSize: 18, fontWeight: "600", marginBottom: 5 }
+  itemTitle: { fontSize: 18, fontWeight: "600", marginBottom: 5 },
+  noItemsText: { textAlign: "center", fontSize: 16, color: "#888", marginTop: 15 },
 });
 
 export default ClaimedItems;

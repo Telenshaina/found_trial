@@ -1,14 +1,13 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, Alert, Modal } from 'react-native';
+import Icon from 'react-native-vector-icons/Foundation';
+import Icon2 from 'react-native-vector-icons/Ionicons';
 import { RouteProp, useNavigation } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/types';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { supabase } from '../../supabase';
-import { useEffect, useState } from 'react';
-
 
 type ClaimDetailsScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'ClaimDetailsScreen'>;
-
 type ClaimDetailsScreenRouteProp = RouteProp<RootStackParamList, 'ClaimDetailsScreen'>;
 
 type Props = {
@@ -24,7 +23,6 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
   const [hasChatted, setHasChatted] = useState(false);
   const [claimStatus, setClaimStatus] = useState<string | null>(null);
 
-
   const isFinder = userId === claim.found_by;
   const isClaimer = userId === claim.user_id;
 
@@ -38,7 +36,7 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
     fetchUser();
   }, []);
   
-  //to get the claim stats
+  // To get the claim stats
   useEffect(() => {
     const fetchClaimStatus = async () => {
       const { data, error } = await supabase
@@ -53,7 +51,6 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
         setClaimStatus(data?.status || null);
       }
     };
-  
     fetchClaimStatus();
   }, [claim.claim_id]); 
   
@@ -76,11 +73,7 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
     ]);
   };
 
-  
-
-  
-  
-  //This will change the item's status to claimed in the foundy_items table
+  // This will change the item's status to claimed in the foundy_items table
   const handleFinderConfirm = async () => {
     try {
       const { error } = await supabase
@@ -167,8 +160,6 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
       item_name: claim.item_name,
       claim_id: claim.claim_id,
       user_id: claim.user_id,
-
-      
     });
   };
 
@@ -200,7 +191,7 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
     Alert.alert('Success', 'Item received confirmed.');
   };
   
-  //approve button
+  // Approve button
   const confirmReturn = async () => {
     const { error } = await supabase
       .from('claims')
@@ -219,14 +210,14 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
     if (!error) Alert.alert('Success', 'Item received confirmed.');
   };
   
-  //update claim status
+  // Update claim status
   useEffect(() => {
     // Subscribe to changes in found_items table
     const channel = supabase
       .channel('found_items')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'found_items' }, async (payload) => {
         // Check if the status has changed to "Claimed"
-        if (payload.new.status === 'Claimed') {
+        if (payload.new.status === 'claimed') {
           // Update the status of the claim in the claims table
           await updateClaimStatusToClaimed(claim.claim_id);
         }
@@ -238,11 +229,12 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
       supabase.removeChannel(channel);
     };
   }, []);
+
   const updateClaimStatusToClaimed = async (claimId: number) => {
     try {
       const { error } = await supabase
         .from('claims')
-        .update({ status: 'Claimed' })
+        .update({ status: 'claimed' })
         .eq('claim_id', claimId);
   
       if (error) throw error;
@@ -254,16 +246,10 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
     }
   };
   
-  
-  
-  
-  
-  
-
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-        <Text style={styles.backText}>← Back</Text>
+        <Icon2 name='arrow-back' size={24} color='black' />
       </TouchableOpacity>
 
       <Text style={styles.title}>Claim Details</Text>
@@ -294,97 +280,87 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
         )}
       </View>
 
-      {(claim.status.toLowerCase() === 'pending' || claim.status.toLowerCase() === 'approved') && (
-        <TouchableOpacity style={styles.chatButton} onPress={handleChatPress}>
-          <Text style={styles.chatButtonText}>
-            {isFinder ? 'Chat with Claimer' : 'Chat with Uploader'}
-          </Text>
-        </TouchableOpacity>
-      )}
-
-        {incoming && claim.status.toLowerCase() === 'pending' && (
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-            <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: '#4CAF50' }]}
-            onPress={() => handleStatusUpdate('approved')}
-            >
-            <Text style={styles.actionButtonText}>Approve</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: '#FF4C4C' }]}
-            onPress={() => handleStatusUpdate('rejected')}
-            >
-            <Text style={styles.actionButtonText}>Reject</Text>
-            </TouchableOpacity>
-        </View>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 10 }}>
+        {(claim.status.toLowerCase() === 'pending' || claim.status.toLowerCase() === 'approved' || claim.status.toLowerCase() === 'claimed') && (
+          <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#007AFF'}]} onPress={handleChatPress}>
+            <Text style={styles.actionButtonText}>
+              <Icon2 name='chatbubbles' size={18} color='#fff' />  {isFinder ? 'Chat with Claimer' : 'Chat with Uploader'}
+            </Text>
+          </TouchableOpacity>
         )}
 
+{claimStatus && ['approved', 'claimed'].includes(claimStatus) && (
+  <TouchableOpacity
+    onPress={() => navigation.navigate('TransactionScreen', { claim })}
+    disabled={claimStatus === 'pending' || claimStatus === 'rejected'}
+    style={[styles.actionButton, { backgroundColor: '#ff9500' }]}
+  >
+    <Text style={styles.actionButtonText}>
+      <Icon2 name="search" size={18} color="#fff" /> View Transaction Process
+    </Text>
+  </TouchableOpacity>
+)}
 
-      {(isFinder || isClaimer) && (
-        <TouchableOpacity 
-        style={[
-          styles.actionButton, 
-          { 
-            backgroundColor: '#FFA500', 
-            opacity: claimStatus === 'approved' ? 1 : 0.5 
-          }
-        ]}
-        onPress={() => {
-          if (claimStatus === 'approved') {
-            navigation.navigate('TransactionScreen', { claim });
-          } else {
-            Alert.alert('Action Not Allowed', 'The claim must be approved before viewing the transaction process.');
-          }
-        }}
-        disabled={claimStatus !== 'approved'}
-      >
-        <Text style={styles.actionButtonText}>View Transaction Process</Text>
-      </TouchableOpacity>
-      
+
+      </View>
+
+      {incoming && (claim.status.toLowerCase() === 'pending'|| claim.status.toLowerCase() === 'claimed') && (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: '#FF4C4C' }]}
+            onPress={() => handleStatusUpdate('rejected')}
+          >
+            <Text style={styles.actionButtonText}>
+              <Icon name='x' size={18} color='#fff' />  Reject
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: '#34c759' }]}
+            onPress={() => handleStatusUpdate('approved')}
+          >
+            <Text style={styles.actionButtonText}>
+              <Icon name='check' size={18} color='#fff' />  Approve
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#c82333'}]} onPress={handleDeleteClaim}>
+            <Text style={styles.actionButtonText}>
+              <Icon name='trash' size={18} color='#fff' />  Delete Claim</Text>
+          </TouchableOpacity>
+        </View>
       )}
 
-        
-
-      <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteClaim}>
-        <Text style={styles.deleteButtonText}>Delete Claim</Text>
-      </TouchableOpacity>
-
       <Modal visible={modalVisible} transparent animationType="slide">
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContainer}>
-          <Text style={styles.modalTitle}>
-            {actionType === 'finder' ? 'Confirm Return' : 'Confirm Received'}
-          </Text>
-          <Text style={styles.modalMessage}>
-            Are you sure you want to proceed?
-          </Text>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>
+              {actionType === 'finder' ? 'Confirm Return' : 'Confirm Received'}
+            </Text>
+            <Text style={styles.modalMessage}>Are you sure you want to proceed?</Text>
 
-          <View style={styles.modalButtons}>
-            <TouchableOpacity 
-              style={[styles.modalButton, { backgroundColor: '#FF4C4C' }]} 
-              onPress={() => setModalVisible(false)}
-            >
-              <Text style={styles.modalButtonText}>Cancel</Text>
-            </TouchableOpacity>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={[styles.modalButton, { backgroundColor: '#FF4C4C' }]} 
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={[styles.modalButton, { backgroundColor: '#4CAF50' }]} 
-              onPress={() => {
-                setModalVisible(false);
-                actionType === 'finder' ? confirmReturn() : confirmReceived();
-              }}
-            >
-              <Text style={styles.modalButtonText}>Confirm</Text>
-            </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalButton, { backgroundColor: '#4CAF50' }]} 
+                onPress={() => {
+                  setModalVisible(false);
+                  actionType === 'finder' ? confirmReturn() : confirmReceived();
+                }}
+              >
+                <Text style={styles.modalButtonText}>Confirm</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
-      </View>
-    </Modal>
-
+      </Modal>
     </ScrollView>
-
-
-    
   );
 };
 
@@ -397,16 +373,21 @@ const styles = StyleSheet.create({
   },
   backButton: { alignSelf: 'flex-start', marginBottom: 20 },
   backText: { fontSize: 16, color: '#007AFF' },
-  title: { fontSize: 26, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
+  title: { fontSize: 28, fontWeight: '700', marginBottom: 24, textAlign: 'center', color: '#333' },
   detailCard: {
-    backgroundColor: '#f0f0f0',
-    padding: 20,
-    borderRadius: 12,
+    backgroundColor: '#f5f5f5',
+    padding: 24,
+    borderRadius: 16,
     width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
     alignItems: 'center',
     marginBottom: 30,
   },
-  label: { fontWeight: 'bold', marginTop: 12, alignSelf: 'flex-start' },
+  label: { fontSize: 14, fontWeight: '600', marginTop: 12, alignSelf: 'flex-start' },
   value: { fontSize: 16, marginTop: 4, alignSelf: 'flex-start' },
   proofImage: {
     width: '100%',
@@ -414,34 +395,16 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginTop: 12,
   },
-  chatButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 12,
-    paddingHorizontal: 30,
-    borderRadius: 25,
-    marginBottom: 15,
-  },
-  chatButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  deleteButton: {
-    backgroundColor: '#FF4C4C',
-    paddingVertical: 12,
-    paddingHorizontal: 30,
-    borderRadius: 25,
-  },
-  deleteButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
   actionButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 25,
-    marginVertical: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 20,
+    marginVertical: 8,
+    minWidth: '40%',
+    maxWidth: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexGrow: 2,
   },
   actionButtonText: {
     color: '#fff',
@@ -493,7 +456,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 16,
   },
-  
 });
 
 export default ClaimDetailsScreen;

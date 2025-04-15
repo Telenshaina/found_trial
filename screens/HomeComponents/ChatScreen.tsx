@@ -1,16 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  Modal,
-  Alert,
-} from "react-native";
+import { View, Text, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, StyleSheet, Modal, Alert, SafeAreaView } from "react-native";
+import Icon from 'react-native-vector-icons/Ionicons';
 import { useRoute, useNavigation } from "@react-navigation/native";
 import type { RouteProp } from "@react-navigation/native";
 import { RootStackParamList } from "../../navigation/types";
@@ -37,8 +27,9 @@ const ChatScreen = () => {
   const [inputText, setInputText] = useState("");
   const [userId, setUserId] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
-
+  const [claimStatus, setClaimStatus] = useState<string | null>(null);
   const flatListRef = useRef<FlatList<any>>(null);
+  const isChatDisabled = claimStatus === "approved" || claimStatus === "completed";
 
   useEffect(() => {
     const getUser = async () => {
@@ -50,12 +41,28 @@ const ChatScreen = () => {
     getUser();
   }, []);
 
+  useEffect(() => {
+    const fetchClaimStatus = async () => {
+      const { data, error } = await supabase
+        .from("claims")
+        .select("status")
+        .eq("claim_id", claim_id)
+        .single();
+
+      if (!error && data?.status) {
+        setClaimStatus(data.status);
+      }
+    };
+
+    fetchClaimStatus();
+  }, [claim_id]);
+
   const receiverId = uploader_id;
 
   useEffect(() => {
-    if (!claim_id) return;
-
     const fetchMessages = async () => {
+      if (!claim_id) return;
+  
       const { data, error } = await supabase
         .from("chats")
         .select("*")
@@ -65,7 +72,11 @@ const ChatScreen = () => {
       if (error) {
         console.error("Error fetching messages:", error.message);
       } else {
-        setMessages(data);
+        if (data && data.length > 0) {
+          setMessages(data);
+        } else {
+          console.log("No messages for this claim_id.");
+        }
       }
     };
 
@@ -73,15 +84,19 @@ const ChatScreen = () => {
 
     const subscription = supabase
       .channel(`chats:claim_id=${claim_id}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chats", filter: `claim_id=eq.${claim_id}` }, (payload) => {
-        setMessages((prevMessages) => {
-          const isDuplicate = prevMessages.some((msg) => msg.created_at === payload.new.created_at);
-          if (!isDuplicate) {
-            return [...prevMessages, payload.new];
-          }
-          return prevMessages;
-        });
-      })
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "chats", filter: `claim_id=eq.${claim_id}` },
+        (payload) => {
+          setMessages((prevMessages) => {
+            const isDuplicate = prevMessages.some((msg) => msg.created_at === payload.new.created_at);
+            if (!isDuplicate) {
+              return [...prevMessages, payload.new];
+            }
+            return prevMessages;
+          });
+        }
+      )
       .subscribe();
 
     return () => {
@@ -90,7 +105,7 @@ const ChatScreen = () => {
   }, [claim_id]);
 
   const handleSend = async () => {
-    if (inputText.trim() === "" || !userId) return;
+    if (inputText.trim() === "" || !userId || isChatDisabled) return;
 
     let finalReceiverId = receiverId;
 
@@ -156,6 +171,7 @@ const ChatScreen = () => {
       if (itemError) throw itemError;
 
       alert("Claim approved! Proceed with returning the item.");
+      setClaimStatus("approved");
     } catch (error: any) {
       console.error("Error approving claim:", error.message);
       alert("Failed to approve claim. Try again.");
@@ -171,10 +187,10 @@ const ChatScreen = () => {
   }, [messages]);
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backText}>← Back</Text>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <Icon name='arrow-back' size={24} color='black' />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Chat about {item_name}</Text>
       </View>
@@ -195,29 +211,45 @@ const ChatScreen = () => {
         )}
         contentContainerStyle={{ paddingVertical: 20 }}
       />
+      {!isChatDisabled && (
+        <>
+          <View style={styles.approvalWarningBox}>
+            <Text style={styles.approvalWarningText}>
+              Approving the claimer's request will proceed you to the returning process. This will disregard other claims on this item.{" "}
+              <Text style={{ fontWeight: "bold" }}>
+                Proceed with caution — this action cannot be undone.
+              </Text>
+            </Text>
+          </View>
 
-      {userId === uploader_id && (
-        <TouchableOpacity
-          style={styles.approveButton}
-          onPress={() => setModalVisible(true)} // Show modal on button press
-        >
-          <Text style={{ color: "#fff", fontWeight: "bold" }}>Approve Claim</Text>
-        </TouchableOpacity>
+          <TouchableOpacity style={styles.approveButton} onPress={() => setModalVisible(true)}>
+            <Text style={{ color: "#fff", fontWeight: "bold" }}>Approve Claim</Text>
+          </TouchableOpacity>
+        </>
       )}
 
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={80}>
-        <View style={styles.inputContainer}>
-          <TextInput
-            placeholder="Type a message..."
-            style={styles.textInput}
-            value={inputText}
-            onChangeText={setInputText}
-          />
-          <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
-            <Text style={{ color: "#fff", fontWeight: "bold" }}>Send</Text>
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
+      {isChatDisabled && (
+        <Text style={styles.claimNote}>This item has been claimed. Thank you!</Text>
+      )}
+
+
+      {!isChatDisabled && (
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={80}>
+          <View style={styles.inputContainer}>
+            <TextInput
+              placeholder="Type a message..."
+              style={styles.textInput}
+              value={inputText}
+              onChangeText={setInputText}
+              onSubmitEditing={handleSend} // enter button
+              blurOnSubmit={false} // keyb funct
+            />
+            <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
+              <Text style={{ color: "#fff", fontWeight: "bold" }}>Send</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      )}
 
       <Modal animationType="slide" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
         <View style={styles.modalContainer}>
@@ -228,24 +260,18 @@ const ChatScreen = () => {
             </Text>
 
             <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setModalVisible(false)}
-              >
+              <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={() => setModalVisible(false)}>
                 <Text style={{ color: "#fff" }}>Cancel</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[styles.modalButton, styles.approveModalButton]}
-                onPress={handleApprove}
-              >
+              <TouchableOpacity style={[styles.modalButton, styles.approveModalButton]} onPress={handleApprove}>
                 <Text style={{ color: "#fff" }}>Approve</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -258,7 +284,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
   },
-  backText: { fontSize: 16, color: "#007AFF", marginRight: 10 },
+  backButton: { marginRight: 10 },
   headerTitle: { fontSize: 18, fontWeight: "bold" },
   messageBubble: {
     padding: 10,
@@ -307,6 +333,12 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     alignItems: "center",
   },
+  claimNote: {
+    textAlign: "center",
+    color: "gray",
+    marginBottom: 10,
+    fontStyle: "italic",
+  },
   modalContainer: {
     flex: 1,
     justifyContent: "center",
@@ -342,10 +374,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   cancelButton: {
-    backgroundColor: "#ccc",
+    backgroundColor: "#FF3B30",
   },
   approveModalButton: {
-    backgroundColor: "green",
+    backgroundColor: "#34C759",
+  },
+  approvalWarningBox: {
+    backgroundColor: "#FFF5E1",
+    borderColor: "#FFA500",
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    marginHorizontal: 10,
+    marginBottom: 8,
+  },
+  approvalWarningText: {
+    color: "#7A4E00",
+    fontSize: 14,
+    lineHeight: 18,
   },
 });
 

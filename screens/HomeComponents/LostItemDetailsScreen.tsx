@@ -6,7 +6,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../../supabase';
 
-const LostItemUploadScreen = ({ route }: { route: any }) => {
+const LostItemDetailScreen = ({ route }: { route: any }) => {
   const { item } = route.params;
   const navigation = useNavigation();
 
@@ -376,7 +376,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 16,
   },
-  image: { width: '100%', height: '100%', borderRadius: 12 },
+  image: { width: '100%', height: '100%', borderRadius: 12, resizeMode: 'contain', },
 
   section: { marginTop: 16 },
   sectionTitle: { fontSize: 16, fontWeight: 'bold' },
@@ -478,4 +478,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default LostItemUploadScreen;
+export default LostItemDetailScreen;

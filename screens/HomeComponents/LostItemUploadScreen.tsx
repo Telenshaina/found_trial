@@ -1,426 +1,480 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Platform, Image } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
-import RNPickerSelect from 'react-native-picker-select';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import React, { useEffect, useState } from 'react';
+import {
+  View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, Modal, TextInput, Button, ActivityIndicator
+} from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { supabase } from '../../supabase';
 import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { RootStackParamList } from '../../App';
+import { supabase } from '../../supabase';
 
-// Upload Lost Item Form Tab Methods
-const LostItemUploadScreen = () => {
-  type NavigationProp = StackNavigationProp<RootStackParamList, 'LostItemUploadScreen'>;
-  const navigation = useNavigation<NavigationProp>();
+const LostItemUploadScreen = ({ route }: { route: any }) => {
+  const { item } = route.params;
+  const navigation = useNavigation();
 
-  const [itemName, setItemName] = useState('');
-  const [category, setCategory] = useState('');
-  const [lastSeenAt, setLastSeenAt] = useState('');
-  const [dateLost, setDateLost] = useState(new Date());
-  const [description, setDescription] = useState('');
-  const [image, setImage] = useState<string | null>(null);
-  const [showPicker, setShowPicker] = useState(false);
-  const [tags, setTags] = useState<string[]>([]);
-  const [tagInput, setTagInput] = useState('');
+  const [lostByUser, setLostByUser] = useState<string | null>(null);
+  const [authUserId, setAuthUserId] = useState<string | null>(null);
+  const [isProofModalVisible, setProofModalVisible] = useState(false);
+  const [isStatusModalVisible, setStatusModalVisible] = useState(false);
+  const [proofImage, setProofImage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [proofData, setProofData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    identifyingInfo: "",
+    pickupLocation: "",
+  });
+  const [errors, setErrors] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    identifyingInfo: "",
+  });
+
+  const isOwner = authUserId === item.posted_by;
+
+  // Fetch authenticated user's ID
+  useEffect(() => {
+    const fetchAuthUser = async () => {
+      const { data, error } = await supabase.auth.getUser();
+      if (data?.user) {
+        setAuthUserId(data.user.id);
+      } else if (error) {
+        console.error('Error fetching auth user:', error);
+      }
+    };
+    fetchAuthUser();
+  }, []);
+
+  // Fetch user details based on posted_by UUID
+  useEffect(() => {
+    const fetchUser = async () => {
+      if (item.posted_by) {
+        const { data, error } = await supabase
+          .from('institutional_users')
+          .select('name')
+          .eq('id', item.posted_by)
+          .single();
+
+        if (data) setLostByUser(data.name);
+        if (error) console.error('Error fetching user:', error);
+      }
+    };
+    fetchUser();
+  }, [item.posted_by]);
+
+  const handleButtonPress = () => {
+    if (isOwner) {
+      setStatusModalVisible(true);
+    } else {
+      setProofModalVisible(true);
+    }
+  };
+
+  // Function to pick an image for proof submission
+ const handlePickImage = async () => {
+     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+     if (status !== 'granted') {
+       alert('Permission to access gallery is required!');
+       return;
+     }
+   
+     const result = await ImagePicker.launchImageLibraryAsync({
+       mediaTypes: ImagePicker.MediaTypeOptions.Images,
+       allowsEditing: true,
+       quality: 0.7,
+     });
+   
+     if (!result.canceled) {
+       setProofImage(result.assets[0].uri);
+     }
+   };
   
-  // Tag management: Add tags using enter only
-  const handleTagInput = (text: string) => {
-    setTagInput(text); // Update input state normally
-  }
 
-  // Tag management: Handles tagSubmit
-  const handleTagSubmit = () => {
-    let newTag = tagInput.trim(); // Remove extra spaces
-    if (newTag && !tags.includes(newTag)) {
-      setTags([...tags, newTag]); // Add tag only if unique & not empty
-    }
-    setTagInput(''); // Clear input after adding
-  };
-
-  // Tag management: Remove tag
-  const removeTag = (tagToRemove: string) => {
-    setTags(tags.filter(tag => tag !== tagToRemove));
-  };
-
-  // Function to handle data picker change
-  const handleDateChange = (event: any, selectedDate?: Date) => {
-    setShowPicker(Platform.OS === 'ios');
-    if (selectedDate) {
-      setDateLost(selectedDate);
-    }
-  };
-
-  // Upload image
-  const pickImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-    });
+  // Function to submit proof
+  
     
-    if (!result.canceled) {
-      setImage(result.assets[0].uri);
-    }
-  };
-
-  // Take photo
-  const takePhoto = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      alert('Sorry, we need camera permissions to make this work!');
-      return;
-    }
+      // Function to submit proof
+      const handleSubmitProof = async () => {
+        let newErrors = { name: "", email: "", phone: "", identifyingInfo: "" };
+      
+        if (!proofData.name) newErrors.name = "Full name is required";
+        if (!proofData.email) newErrors.email = "Email is required";
+        if (!proofData.phone) newErrors.phone = "Phone number is required";
+        if (!proofData.identifyingInfo) newErrors.identifyingInfo = "Please provide proof details";
+      
+        setErrors(newErrors);
+        if (Object.values(newErrors).some((error) => error !== "")) return;
+      
+        setIsSubmitting(true);
+      
+        let proofUrl = null;
+      
+        //  Upload image only if an image is selected
+        if (proofImage) {
+          try {
+            const response = await fetch(proofImage);
+            const blob = await response.blob(); // Convert image to Blob
+            const fileName = `${authUserId}_${Date.now()}.jpg`;
+      
+            const { data: uploadData, error: uploadError } = await supabase.storage
+              .from('proofs')
+              .upload(fileName, blob, {
+                contentType: 'image/jpeg',
+              });
+      
+            if (uploadError) {
+              console.error('Error uploading image:', uploadError);
+              alert('Failed to upload proof image.');
+              setIsSubmitting(false);
+              return;
+            }
+      
+            proofUrl = supabase.storage.from('proofs').getPublicUrl(fileName).data.publicUrl;
+          } catch (error) {
+            console.error('Error converting image to Blob:', error);
+            alert('Failed to process proof image.');
+            setIsSubmitting(false);
+            return;
+          }
+        }
   
-    let result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-    });
-  
-    if (!result.canceled) {
-      setImage(result.assets[0].uri);
-    }
-  };
-
-  // Upload data to Supabase
-  const uploadToSupabase = async () => {
-    if (!itemName || !category || !lastSeenAt || !description || !image) {
-      alert('Please fill all fields and select an image.');
-      return;
-    }
-  
-    try {
-      // Get authenticated user
-      const { data: user, error: userError } = await supabase.auth.getUser();
-      if (userError || !user?.user) {
-        alert('User not authenticated. Please log in.');
-        return;
-      }
-
-      const userId = user.user.id; // Extract user ID
-      const userEmail = user.user.email || ''; // Extract user email
-      // Determine user type based on email
-      let userType = 'Guest'; // Default to 'Guest'
-      if (userEmail.endsWith('neu.edu.ph')) {
-        userType = 'Institutional';
-      }
-      const fileName = `images/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.jpg`;
-      const response = await fetch(image);
-      const blob = await response.blob();
-  
-      const { data, error } = await supabase.storage.from('uploads').upload(fileName, blob, {
-        contentType: 'image/jpeg', // Ensure correct content type
-      });
-  
-      if (error) {
-        console.error('Upload error:', error);
-        alert(`Image upload failed: ${error.message}`);
-        return;
-      }
-  
-      const imageUrl = supabase.storage.from('uploads').getPublicUrl(fileName).data.publicUrl;
-  
-      console.log('Uploaded Image URL:', imageUrl); // Debugging
-  
-      // Insert lost item with authenticated user ID
-      const { error: dbError } = await supabase.from('lost_items').insert([
+    // Insert proof details into Supabase
+    const { error } = await supabase
+      .from('yields')
+      .insert([
         {
-          item_name: itemName,
-          category,
-          last_seen_at: lastSeenAt,
-          date_lost: dateLost,
-          description,
-          tags: tags,
-          image_url: imageUrl,
-          posted_by: userId, // Link the lost item to the authenticated user
+          user_id: authUserId,
+          item_id: item.id,
+          proof_url: proofUrl,
+          description: proofData.identifyingInfo,
+          status: 'pending',
         },
       ]);
   
-      if (dbError) {
-        console.error('Database error:', dbError);
-        alert(`Failed to upload item: ${dbError.message}`);
-        return;
-      }
-
-      // Log the activity in user_logs
-    const { error: logError } = await supabase.from('user_logs').insert([
-      {
-        user_id: userId,
-        name: user.user.user_metadata?.full_name || 'Unknown User',
-        email: userEmail,
-        activity_type: 'Lost Item',
-        user_type: userType,
-        timestamp: new Date(),
-      },
-    ]);
-
-    if (logError) {
-      console.error('Log error:', logError);
-    }
+    setIsSubmitting(false);
   
-      alert('Item uploaded successfully!');
-      navigation.navigate('Home');
-    } catch (err) {
-      console.error('Unexpected error:', err);
-      alert('Something went wrong. Please try again.');
+    if (error) {
+      console.error('Error submitting proof:', error);
+      alert('Failed to submit proof.');
+    } else {
+      alert('Proof submitted successfully! The owner will review your request.');
+      setProofModalVisible(false);
     }
   };
   
-  // UI Implementation for Lost Items Form
-  return (
-    <ScrollView style={styles.main}>
-      <View style={styles.form}>
-        <Text style={styles.title}>🛑 Lost Item Report 🛑</Text>
-        <Text style={styles.subtitle}>
-          Lost something? Don't worry—we're here to help! 
-          Fill out the details below about your missing item, 
-          including where you last saw it and any identifying 
-          features. We'll do our best to assist in locating and 
-          returning it to you.
-        </Text>
+  
 
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>ITEM NAME</Text>
-          <TextInput style={styles.input} placeholder="Enter item name" placeholderTextColor="#666"
-            onChangeText={setItemName} value={itemName} />
+  return (
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>FoundNEU</Text>
+      </View>
+
+      {/* Main Content */}
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.row}>
+          <Text style={styles.itemName}>{item.item_name}</Text>
+          <View style={styles.unclaimedBadge}>
+            <Text style={styles.unclaimedText}>Unfound</Text>
+          </View>
         </View>
 
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>CATEGORY</Text>
-          <RNPickerSelect
-            onValueChange={(value) => setCategory(value)}
-            items={[
-              { label: 'Accessory', value: 'Accessory' },
-              { label: 'Clothes', value: 'Clothes' },
-              { label: 'Document', value: 'Document' },
-              { label: 'Electronic', value: 'Electronic' },
-              { label: 'Identification Card', value: 'Identification Card' },
-              { label: 'Money', value: 'Money' },
-              { label: 'Umbrella', value: 'Umbrella' },
-              { label: 'Wallet', value: 'Wallet' },
-              { label: 'Others', value: 'Others' },
-            ]}
-            placeholder={{ label: "Select a category...", value: null }}
-            style={pickerSelectStyles}
-            value={category}
-            />
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+          <Text style={styles.postedBy}>
+            Lost by: @{lostByUser || 'Loading...'}
+          </Text>
+          {item.posted_by === 'guest' && (
+          <View style={styles.guestTag}>
+            <Text style={styles.guestTagText}>Guest</Text>
           </View>
+)}
 
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>LAST SEEN AT</Text>
-            <TextInput style={styles.input} placeholder="Enter last known location" 
-              placeholderTextColor="#666" onChangeText={setLastSeenAt} value={lastSeenAt}
-            />
+          
+        </View>
+
+
+        <View style={styles.badgeContainer}>
+          <View style={styles.categoryBadge}>
+            <Text style={styles.categoryText}>Category: {item.category}</Text>
           </View>
+        </View>
 
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>DATE LOST</Text>
-            <TouchableOpacity style={styles.select} onPress={() => setShowPicker(true)}>
-              <MaterialIcons name="calendar-today" size={20} color="gray" />
-              <Text style={styles.selectText}>{dateLost.toLocaleDateString()}</Text>
-            </TouchableOpacity>
+        <View style={styles.imageContainer}>
+          <Image source={{ uri: item.image_url }} style={styles.image} />
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Location Lost</Text>
+          <Text style={styles.dateText}>Date Lost: {new Date(item.date_lost).toLocaleDateString()}</Text>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Description</Text>
+          <View style={styles.descriptionBox}>
+            <Text style={styles.descriptionText}>
+              {item.description || 'No description available'}
+            </Text>
           </View>
-
-          {showPicker && (
-            <DateTimePicker value={dateLost} mode="date" display="default" onChange={handleDateChange} />
-          )}
-
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>DESCRIPTION</Text>
-            <TextInput style={[styles.input, styles.textarea]} placeholder="Describe the lost item in detail" 
-              placeholderTextColor="#666" onChangeText={setDescription} value={description} multiline />
-          </View>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>TAGS</Text>
-            <View style={styles.tagContainer}>
-              {tags.map((tag, index) => (
-                <View key={index} style={styles.tag}>
-                  <Text style={styles.tagText}>{tag}</Text>
-                  <TouchableOpacity onPress={() => removeTag(tag)}>
-                    <MaterialIcons name="close" size={16} color="#fff" />
-                  </TouchableOpacity>
-                </View>
-              ))}
-              <TextInput
-                style={[styles.input, styles.tagInput]}
-                placeholder="Add tags (press enter)"
-                value={tagInput}
-                onChangeText={handleTagInput}
-                onSubmitEditing={handleTagSubmit} 
-                blurOnSubmit={false}
-              />
-            </View>
-          </View>
-
-          <View style={styles.buttonGroup}>
-            <TouchableOpacity style={[styles.button, styles.outlineButton]} onPress={pickImage}>
-              <MaterialIcons name="upload-file" size={20} color="black" />
-              <Text style={styles.outlineButtonText}>Upload Image</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={[styles.button, styles.outlineButton]} onPress={takePhoto}>
-              <MaterialIcons name="camera-alt" size={20} color="black" />
-              <Text style={styles.outlineButtonText}>Open Camera</Text>
-            </TouchableOpacity>
-          </View>
-
-          {image && <Image source={{ uri: image }} style={{ width: 100, height: 100, alignSelf: 'center' }} />}
-
-          <TouchableOpacity style={[styles.button, styles.primaryButton]} onPress={uploadToSupabase}>
-            <Text style={styles.primaryButtonText}>Post Item</Text>
-          </TouchableOpacity>
-
         </View>
       </ScrollView>
+
+      {/* Fixed Bottom Button */}
+      <View style={styles.bottomButtonContainer}>
+        {isOwner && <Text style={styles.ownerNote}>You uploaded this Item</Text>}
+        
+        <TouchableOpacity style={styles.claimButton} onPress={handleButtonPress}>
+          <Text style={styles.claimButtonText}>
+            {isOwner ? 'Check Status' : 'I found This Item'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Proof Submission Modal */}
+      <Modal visible={isProofModalVisible} animationType="slide" transparent>
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContainer}>
+                <Text style={styles.modalTitle}>Submit Proof of Ownership</Text>
+                <Text style={styles.modalDescription}>
+                  Please provide details to prove this item belongs to you. The owner will review your claim.
+                </Text>
+      
+                {/* Full Name Input */}
+                <TextInput
+                  style={[styles.input, errors.name && styles.errorInput]}
+                  placeholder="Your full name"
+                  value={proofData.name}
+                  onChangeText={(text) => setProofData({ ...proofData, name: text })}
+                />
+                {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
+      
+                {/* Email Input */}
+                <TextInput
+                  style={[styles.input, errors.email && styles.errorInput]}
+                  placeholder="Your email"
+                  keyboardType="email-address"
+                  value={proofData.email}
+                  onChangeText={(text) => setProofData({ ...proofData, email: text })}
+                />
+                {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
+      
+                {/* Phone Input */}
+                <TextInput
+                  style={[styles.input, errors.phone && styles.errorInput]}
+                  placeholder="Your phone number"
+                  keyboardType="phone-pad"
+                  value={proofData.phone}
+                  onChangeText={(text) => setProofData({ ...proofData, phone: text })}
+                />
+                {errors.phone && <Text style={styles.errorText}>{errors.phone}</Text>}
+      
+                {/* Identifying Information Input */}
+                <TextInput
+                  style={[styles.textarea, errors.identifyingInfo && styles.errorInput]}
+                  placeholder="Provide details to prove this item belongs to you..."
+                  multiline
+                  value={proofData.identifyingInfo}
+                  onChangeText={(text) => setProofData({ ...proofData, identifyingInfo: text })}
+                />
+                {errors.identifyingInfo && <Text style={styles.errorText}>{errors.identifyingInfo}</Text>}
+      
+                {/* Pickup Location (Optional) */}
+                <TextInput
+                  style={styles.input}
+                  placeholder="Preferred pickup location (optional)"
+                  value={proofData.pickupLocation}
+                  onChangeText={(text) => setProofData({ ...proofData, pickupLocation: text })}
+                />
+                <TouchableOpacity onPress={handlePickImage} style={[styles.button, { marginVertical: 10 }]}>
+                    <Text style={styles.buttonText}>
+                      {proofImage ? 'Change Uploaded Image' : 'Optional: Upload Image'}
+                    </Text>
+                  </TouchableOpacity>
+      
+                  {proofImage && (
+                    <Image source={{ uri: proofImage }} style={{ width: '100%', height: 150, borderRadius: 8, marginBottom: 10 }} />
+                  )}
+      
+                {/* Buttons */}
+                <View style={styles.buttonContainer}>
+                  <TouchableOpacity onPress={() => setProofModalVisible(false)} style={[styles.button, styles.cancelButton]}>
+                    <Text style={styles.buttonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={handleSubmitProof} style={styles.button}>
+                    <Text style={styles.buttonText}>Submit Proof</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+      
+      
+      
+            {/* Check Status Modal */}
+            <Modal visible={isStatusModalVisible} animationType="fade" transparent>
+              <View style={styles.modalContainer}>
+                <View style={styles.statusModalContent}>
+                  <Text style={styles.modalTitle}>Item Status</Text>
+                  <Text style={styles.statusText}>Your uploaded item is currently being processed.</Text>
+                  <Text style={styles.statusText}>No one has claimed the Item you have uploaded</Text>
+                  <Text style={styles.infoText}>Check back later for updates.</Text>
+                  <Button title="Close" onPress={() => setStatusModalVisible(false)} />
+                </View>
+              </View>
+            </Modal>
+    </View>
   );
 };
 
-const pickerSelectStyles = {
-  inputIOS: {
-    fontSize: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 10,
-    borderWidth: 1.5,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    color: 'black',
-    paddingRight: 30,
-    backgroundColor: '#fff',
-  },
-  inputAndroid: {
-    fontSize: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 10,
-    borderWidth: 1.5,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    color: 'black',
-    paddingRight: 30,
-    backgroundColor: '#fff',
-  },
-};
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 2,
-    backgroundColor: '#fff',
-  },
-  main: {
-    flex: 1,
-  },
-  form: {
-    padding: 16,
-    gap: 24,
-  },
-  formGroup: {
-    gap: 8,
-  },
-  title: {
-    fontSize: 25,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginTop: 15,
-  },
-  subtitle: {
-    fontSize: 15, 
-    fontWeight: 'normal', 
-    fontStyle: 'italic', 
-    marginBottom: 16, 
-    textAlign: 'center',
-    color: '#666',
-  },
-  label: {
-    fontSize: 14,
-    color: 'black',
-    textTransform: 'uppercase',
-  },
-  input: {
-    borderWidth: 1.5,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    height: 50,
-    backgroundColor: '#fff',
-  },
-  textarea: {
-    height: 120,
-    textAlignVertical: 'top',
-  },
-  select: {
+  container: { flex: 1, backgroundColor: '#F9FAFB' },
+
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: '#E5E5E5',
-    borderRadius: 8,
-    padding: 12,
+    height: 50,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    paddingHorizontal: 16,
   },
-  selectText: {
-    fontSize: 16,
-    color: '#666',
+  headerTitle: { marginLeft: 10, fontSize: 18, fontWeight: 'bold', color: '#DC2626' },
+
+  content: { paddingHorizontal: 16, paddingBottom: 100 },
+
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 20 },
+  itemName: { fontSize: 20, fontWeight: 'bold' },
+  unclaimedBadge: { backgroundColor: '#FCE7F3', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+  unclaimedText: { fontSize: 12, color: '#9D174D', fontWeight: 'bold' },
+
+  postedBy: { fontSize: 12, color: '#6B7280', marginTop: 4 },
+  guestTag: {
+    backgroundColor: '#FFD700',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginLeft: 8,
   },
-  buttonGroup: {
-    flexDirection: 'row',  // Arrange buttons side by side
-    gap: 16,               // Add spacing between buttons
+  guestTagText: {
+    color: '#333',
+    
+    fontWeight: 'bold',
+    fontSize: 10,
+  },
+  
+
+  badgeContainer: { flexDirection: 'row', marginTop: 8 },
+  categoryBadge: { backgroundColor: '#EDE9FE', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
+  categoryText: { fontSize: 12, color: '#5B21B6', fontWeight: 'bold' },
+
+  imageContainer: {
+    backgroundColor: '#E5E7EB',
+    width: '100%',
+    height: 220,
+    borderRadius: 12,
     justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  image: { width: '100%', height: '100%', borderRadius: 12, resizeMode: 'contain', },
+
+  section: { marginTop: 16 },
+  sectionTitle: { fontSize: 16, fontWeight: 'bold' },
+  dateText: { fontSize: 14, color: '#6B7280', marginTop: 4 },
+
+  descriptionBox: { backgroundColor: '#F3F4F6', padding: 12, borderRadius: 8, marginTop: 4 },
+  descriptionText: { fontSize: 14, color: '#4B5563' },
+
+  bottomButtonContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 16,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  ownerNote: { fontSize: 14, color: '#059669', fontWeight: 'bold', textAlign: 'center', marginBottom: 8 },
+  claimButton: { backgroundColor: '#000', paddingVertical: 14, borderRadius: 8, alignItems: 'center' },
+  claimButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+
+ 
+  statusText: { fontSize: 16, marginVertical: 10, textAlign: 'center' },
+  infoText: { fontSize: 14, color: '#6B7280', marginBottom: 10, textAlign: 'center' }, // Add this line
+  
+  statusModalContent: {
+    backgroundColor: 'white',
+    padding: 20,
+    borderRadius: 10,
+    width: 300,
+    alignItems: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContainer: {
+    width: "90%",
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 10,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 5,
+  },
+  modalDescription: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 15,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10,
+  },
+  textarea: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 10,
+    height: 80,
+    textAlignVertical: "top",
+    marginBottom: 10,
+  },
+  buttonContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
   button: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "#000",
     padding: 12,
     borderRadius: 8,
-    gap: 8,
+    alignItems: "center",
+    marginHorizontal: 5,
   },
-  outlineButton: {
-    borderWidth: 1,
-    borderColor: '#E5E5E5',
+  cancelButton: {
+    backgroundColor: "red",
   },
-  outlineButtonText: {
-    fontSize: 16,
-    color: '#000',
+  buttonText: {
+    color: "#fff",
+    fontWeight: "bold",
   },
-  primaryButton: {
-    backgroundColor: '#000',
+  errorText: {
+    fontSize: 12,
+    color: "red",
+    marginBottom: 5,
   },
-  primaryButtonText: {
-    fontSize: 16,
-    color: '#fff',
-    fontWeight: '500',
-  },
-  tagContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    padding: 8,
-    borderWidth: 1.5,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    backgroundColor: '#fff',
-  },
-  tag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#000',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  tagText: {
-    color: '#fff',
-    fontSize: 14,
-    marginRight: 6,
-  },
-  tagInput: {
-    flex: 1,
-    fontSize: 16,
-    padding: 8,
-    minWidth: 100,
+  errorInput: {
+    borderColor: "red",
   },
 });
 

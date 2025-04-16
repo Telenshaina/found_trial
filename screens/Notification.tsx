@@ -8,30 +8,40 @@ const Notification = () => {
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    // Fetch notifications when the component is mounted
     const fetchNotifications = async () => {
       setLoading(true);
-    
+  
+      // Get current user
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+  
+      if (userError || !user) {
+        console.error("Error fetching current user:", userError);
+        setLoading(false);
+        return;
+      }
+  
       const { data, error } = await supabase
         .from("notifications")
-        .select("*") // You can specify the columns you need, like receiver_id, item_id, sender_id
-        .order("created_at", { ascending: false }); // Order by the most recent notifications
-    
+        .select("*")
+        .eq("receiver_id", user.id) // Only get notifications for current user
+        .order("created_at", { ascending: false });
+  
       if (error) {
         console.error("Error fetching notifications:", error);
         setLoading(false);
         return;
       }
-    
-      console.log("Fetched notifications:", data); // Log the fetched data
-    
-      setNotifications(data); // Update state with the fetched notifications
-      setLoading(false); // Set loading to false once data is fetched
+  
+      setNotifications(data);
+      setLoading(false);
     };
-    
-
-    fetchNotifications(); // Call the fetch function
+  
+    fetchNotifications();
   }, []);
+  
 
   // If loading, show a loading spinner
   if (loading) {
@@ -56,7 +66,7 @@ const Notification = () => {
           <View style={styles.notificationItem}>
             <View style={styles.avatarPlaceholder} />
             <Text style={styles.notificationText}>
-              {`User ID ${item.sender_id} wants to claim your item: ${item.item_id}`}
+              {item.message}
             </Text>
             {item.unread && <View style={styles.unreadDot} />}
           </View>

@@ -5,11 +5,15 @@ import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../../supabase';
 import EditItem from './EditItem';
+import ClaimReportModal from '../../assets/modals/ClaimReportModal';
 
 const FoundItemDetailsScreen = ({ route }: { route: any }) => {
   const { item } = route.params;
   const navigation = useNavigation();
   
+  const [reason, setReason] = useState<string>(''); 
+  const currentUser = supabase.auth.getUser();
+  const [modalVisible, setModalVisible] = useState(false);
   const [foundByUser, setFoundByUser] = useState<string | null>(null);
   const [authUserId, setAuthUserId] = useState<string | null>(null);
   const [isProofModalVisible, setProofModalVisible] = useState(false);
@@ -37,6 +41,12 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
   });
 
   const isOwner = authUserId === item.found_by;
+  // CLOSING MODAL
+  const handleClose = () => {
+    setModalVisible(false);
+    setProofModalVisible(false);
+    setStatusModalVisible(false);
+  };
 
   // Fetch authenticated user's ID
   useEffect(() => {
@@ -68,23 +78,52 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
     fetchUser();
   }, [item.found_by]);
   
-  // Fetch the status of the found item
-  useEffect(() => {
-    const fetchItemStatus = async () => {
-      const { data, error } = await supabase
-        .from('found_items')
-        .select('status')
-        .eq('item_id', item.item_id)
-        .single();
-      
-      if (data) {
-        setFoundItemStatus(data.status);
-      }
-      if (error) {
-        console.error('Error fetching item status:', error);
-      }
-    };
-    fetchItemStatus();
+    // Fetch user details and update state
+    useEffect(() => {
+      const fetchUserDetails = async () => {
+        if (!authUserId) return;
+
+        const { data, error } = await supabase
+          .from('institutional_users')
+          .select('name, email, phone_number')
+          .eq('id', authUserId)
+          .single();
+
+        if (data) {
+          setProofData((prevData) => ({
+            ...prevData,
+            name: data.name,
+            email: data.email,
+            phone: data.phone_number,
+          }));
+        }
+
+        if (error) {
+          console.error('Error fetching user details:', error);
+        }
+      };
+
+      fetchUserDetails();
+    }, [authUserId]);
+
+    // Fetch the status of the found item
+    useEffect(() => {
+      const fetchItemStatus = async () => {
+        const { data, error } = await supabase
+          .from('found_items')
+          .select('status')
+          .eq('item_id', item.item_id)
+          .single();
+
+        if (data) {
+          setFoundItemStatus(data.status);
+        }
+        if (error) {
+          console.error('Error fetching item status:', error);
+        }
+      };
+
+      fetchItemStatus();
     }, [item.item_id]);
   
     const handleEditSubmit = () => {
@@ -119,6 +158,87 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
     }
   };
 
+  // Claim Report
+  const handleSubmitClaim = async (data: {
+    item_id: string;
+    reason: string;
+    imageUri: string | null;
+    user: { name: string; email: string; phone: string };
+  }) => {
+    try {
+      setIsSubmitting(true);
+  
+      console.log("Submitting claim report:", data);
+  
+      const { error } = await supabase
+        .from("claim_reports")
+        .insert([
+          {
+            item_id: item.item_id,
+            name: data.user.name,  
+            email: data.user.email,
+            phone_number: data.user.phone,
+            reason: data.reason, 
+            proof_url: data.imageUri,  
+          },
+        ]);
+  
+  
+      if (error) {
+        console.error("Error submitting claim report", error);
+        alert("Failed to submit claim.");
+      } else {
+        alert("Claim report submitted successfully.");
+      }
+    } catch (error) {
+      console.error("Error submitting claim report", error);
+      alert("Failed to submit claim.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };  
+
+
+    // Submit Claim Report
+    const submitClaim = async () => {
+      if (!authUserId) {
+        alert("User not authenticated.");
+        return;
+      }
+    
+      setIsSubmitting(true);
+    
+      try {
+        const { error } = await supabase.from("claim_reports").insert([
+          {
+            item_id: item.item_id,
+            user_id: authUserId,
+            reason: reason,  
+            name: proofData.name,
+            email: proofData.email,
+            phone: proofData.phone,
+            proof_url: proofImage, 
+            created_at: new Date().toISOString(),
+            status: "pending", 
+          },
+        ]);
+    
+        if (error) {
+          console.error("Error inserting claim report:", error);
+          alert("Failed to submit claim report.");
+        } else {
+          console.log(item.item_id); // Logs the item_id to the console
+          alert("Claim report submitted successfully.");
+          setProofModalVisible(false); // Close the modal
+        }
+      } catch (err) {
+        console.error("Unexpected error:", err);
+        alert("Something went wrong.");
+      } finally {
+        setIsSubmitting(false);
+      }
+    };    
+
   // Function to submit proof
   const handleSubmitProof = async () => {
     let newErrors = { name: "", email: "", phone: "", identifyingInfo: "", pickupLocation: "" };
@@ -133,8 +253,9 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
     if (Object.values(newErrors).some((error) => error !== "")) return;
   
     setIsSubmitting(true);
+  
     let proofUrl = null;
-
+  
     // Upload image only if an image is selected
     if (proofImage) {
       try {
@@ -154,6 +275,7 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
           setIsSubmitting(false);
           return;
         }
+  
         proofUrl = supabase.storage.from('proofs').getPublicUrl(fileName).data.publicUrl;
       } catch (error) {
         console.error('Error converting image to Blob:', error);
@@ -200,18 +322,42 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
   
     const receiverId = foundItemData.found_by; // The user who found the item
   
-    // Insert a new notification into the notifications table
-    const { error: notificationError } = await supabase
-      .from('notifications')
-      .insert([
-        {
-          receiver_id: receiverId,
-          sender_id: authUserId,
-          item_id: item.item_id,
-          message: `A user has submitted proof of ownership for the item "${item.item_name}".`,
-          read: false,
-        },
-      ]);
+    // Fetch sender's name from guest_users
+let { data: guestData, error: guestError } = await supabase
+.from('guest_users')
+.select('name')
+.eq('id', authUserId)
+.single();
+
+// If not found in guest_users, check institutional_users
+let senderName = '';
+if (guestData && guestData.name) {
+senderName = guestData.name;
+} else {
+let { data: institutionalData, error: institutionalError } = await supabase
+  .from('institutional_users')
+  .select('name')
+  .eq('id', authUserId)
+  .single();
+
+if (institutionalData && institutionalData.name) {
+  senderName = institutionalData.name;
+}
+}
+
+// Now insert into notifications
+const { error: notificationError } = await supabase
+.from('notifications')
+.insert([
+  {
+    receiver_id: receiverId,
+    sender_id: authUserId,
+    item_id: item.item_id,
+    message: `${senderName} has submitted proof of ownership for the item "${item.item_name}".`,
+    read: false,
+  },
+]);
+
   
     if (notificationError) {
       console.error('Error inserting notification:', notificationError);
@@ -219,9 +365,13 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
     } else {
       alert('Proof submitted successfully! The owner will review your request.');
     }
+  
     setIsSubmitting(false);
     setProofModalVisible(false);
   };
+  
+  
+
   
   return (
     <View style={styles.container}>
@@ -300,29 +450,29 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
         {isOwner && <Text style={styles.ownerNote}>This is your item</Text>}
         
         {foundItemStatus?.toLowerCase() === "claimed" ? (
-          // If the item is claimed, check if the current user is the one who claimed it
-          item.claimed_by === authUserId ? (
-            <Text style={styles.claimedText}>You claimed this item</Text>
-          ) : (
-            <TouchableOpacity
-              style={styles.claimButton}
-              onPress={() => {
-              // Logic for filing a claim report goes here
-              alert("Filing a Claim Report...");
-              }}
-            >
-              <Text style={styles.claimButtonText}>File a Claim Report</Text>
-            </TouchableOpacity>
-          )
+        // If the item is claimed, check if the current user is the one who claimed it
+        item.claimed_by === authUserId ? (
+          <Text style={styles.claimedText}>You claimed this item</Text>
         ) : (
-          // If the item is not claimed, show the claim button
-          <TouchableOpacity style={styles.claimButton} onPress={handleButtonPress}>
-            <Text style={styles.claimButtonText}>
-              {isOwner ? 'Check Status' : 'Claim Item'}
-            </Text>
+          <TouchableOpacity
+            style={styles.claimButton}
+            onPress={() => {
+              setModalVisible(true)
+              alert("You are about to file a report for this Claimed Item. Please click OK to continue.");
+            }}
+          >
+            <Text style={styles.claimButtonText}>File a Claim Report</Text>
           </TouchableOpacity>
-        )}
-      </View>
+        )
+      ) : (
+        // If the item is not claimed, show the claim button
+        <TouchableOpacity style={styles.claimButton} onPress={handleButtonPress}>
+          <Text style={styles.claimButtonText}>
+            {isOwner ? 'Check Status' : 'Claim Item'}
+          </Text>
+        </TouchableOpacity>
+      )}
+    </View>
 
       {/* Proof Submission Modal */}
       <Modal visible={isProofModalVisible} animationType="slide" transparent>
@@ -401,6 +551,19 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
         </View>
       </View>
     </Modal>
+
+    {/* Claim Report Modal */}
+    <ClaimReportModal
+        visible={modalVisible}
+        handleClose={() => setModalVisible(false)}
+        itemId={item.item_id}
+        user={proofData}
+        isSubmitting={isSubmitting}
+        handleSubmitClaim={handleSubmitClaim}
+        handlePickImage={handlePickImage}
+        reason={reason}
+      />
+
 
     {/* Check Status Modal */}
     <Modal visible={isStatusModalVisible} animationType="fade" transparent>

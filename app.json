@@ -8,6 +8,7 @@
     ],
     "name": "foundneu",
     "slug": "foundneu",
+    "owner": "keltnexus",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -53,7 +54,7 @@
         "projectId": "7faffc61-ba2f-43e9-aeab-dda2923d60d7"
       }
     },
-    "owner": "keltnexus",
+    
     "plugins": [
       [
         "@react-native-google-signin/google-signin",

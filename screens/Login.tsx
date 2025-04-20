@@ -6,11 +6,6 @@ import { supabase } from "../supabase";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
-import {
-  GoogleSignin,
-  GoogleSigninButton,
-  statusCodes,
-} from '@react-native-google-signin/google-signin';
 
 interface RootStackParamList extends Record<string, object | undefined> {
   Login: undefined;
@@ -119,36 +114,29 @@ const InstitutionalLogin: React.FC = () => {
     setLoading(true);
     try {
       const redirectUri = AuthSession.makeRedirectUri();
-     // const redirectUri = "https://auth.expo.io/@keltnexus/foundneu";
 
-      console.log("Redirect URI:", redirectUri);  // Check the printed URI
-
-
-
-      // Step 1: Start OAuth sign-in with Supabase
+      
+  
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: {
-          redirectTo: redirectUri,
-        },
+        options: { redirectTo: redirectUri },
       });
-
+  
       if (error) throw error;
-
+  
       if (data?.url) {
-        console.log("[DEBUG] Opening browser session");
-
-        // Step 2: Open the OAuth session in the browser
+        // Open the OAuth session in the browser
         const result = await WebBrowser.openAuthSessionAsync(
           data.url,
           redirectUri,
-          { preferEphemeralSession: false }
         );
         
-        // Step 3: Check if the result is successful and handle it
-        if (result.type === "success" && result.url) {
-          // Authentication process is handled automatically, so no need to manually get the session
-          console.log('Authentication successful, session will be managed automatically');
+  
+        if (result.type === "success") {
+          // If the result is successful, the session should be established automatically
+          console.log("Authentication successful");
+          // Handle the redirection here (replace with the main page)
+          navigation.replace("Main");
         }
       }
     } catch (error) {
@@ -158,6 +146,8 @@ const InstitutionalLogin: React.FC = () => {
       setLoading(false);
     }
   };
+  
+  
 
 
   return (
@@ -232,8 +222,9 @@ const GuestLogin: React.FC = () => {
   const handleGoogleSignIn = async () => {
     setLoading(true);
     try {
-      const redirectUri = AuthSession.makeRedirectUri();
-
+      const redirectUri = AuthSession.makeRedirectUri({
+        scheme: "foundneu", // must match your app.json
+      });
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: { redirectTo: redirectUri },

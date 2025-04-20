@@ -1,68 +1,57 @@
 {
-  "expo": {
-    "scheme": "foundneu",
-    "platforms": [
-      "ios",
-      "android",
-      "web"
-    ],
-    "name": "foundneu",
-    "slug": "foundneu",
-    "owner": "keltnexus",
-    "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+  "android": {
+    "adaptiveIcon": {
+      "backgroundColor": "#ffffff",
+      "foregroundImage": "./assets/adaptive-icon.png"
     },
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.kelt.foundneu",
-      "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+    "package": "com.kelt.foundneu"
+  },
+  "extra": {
+    "eas": {
+      "projectId": "7faffc61-ba2f-43e9-aeab-dda2923d60d7"
+    }
+  },
+  "icon": "./assets/icon.png",
+  "intentFilters": [
+    {
+      "action": "VIEW",
+      "category": [
+        "BROWSABLE",
+        "DEFAULT"
+      ],
+      "data": {
+        "host": "auth",
+        "scheme": "foundneu"
       }
+    }
+  ],
+  "ios": {
+    "bundleIdentifier": "com.kelt.foundneu",
+    "infoPlist": {
+      "ITSAppUsesNonExemptEncryption": false
     },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
-      "package": "com.kelt.foundneu"
-    },
-    "web": {
-      "favicon": "./assets/neu-logo.png"
-    },
-    "intentFilters": [
-      {
-        "action": "VIEW",
-        "data": {
-          "scheme": "foundneu",
-          "host": "auth"
-        },
-        "category": [
-          "BROWSABLE",
-          "DEFAULT"
-        ]
-      }
-    ],
-    "extra": {
-      "eas": {
-        "projectId": "7faffc61-ba2f-43e9-aeab-dda2923d60d7"
-      }
-    },
-    
-    "plugins": [
-      [
-        "@react-native-google-signin/google-signin",
-        {
-          "iosUrlScheme": "com.googleusercontent.apps.924886088145-4go4tk97ljv2k0legh28vouq1t5vv093"
-        }
-      ]
-      
-    ]
+    "supportsTablet": true
+  },
+  "name": "foundneu",
+  "newArchEnabled": true,
+  "orientation": "portrait",
+  "owner": "keltnexus",
+  "platforms": [
+    "android",
+    "ios",
+    "web"
+  ],
+  "scheme": "foundneu",
+  "sdkVersion": "52.0.0",
+  "slug": "foundneu",
+  "splash": {
+    "backgroundColor": "#ffffff",
+    "image": "./assets/splash-icon.png",
+    "resizeMode": "contain"
+  },
+  "userInterfaceStyle": "light",
+  "version": "1.0.0",
+  "web": {
+    "favicon": "./assets/neu-logo.png"
   }
 }

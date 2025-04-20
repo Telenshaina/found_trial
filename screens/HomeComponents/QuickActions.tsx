@@ -38,7 +38,17 @@ const QuickActions: React.FC<QuickActionsProps> = ({ disabled }) => {
         disabled={disabled}
       >
         <Text style={[styles.buttonText, disabled && styles.disabledText]}>
-          Transactions
+          Claim Center
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.button, disabled && styles.disabledButton]}
+        onPress={() => handleNavigate("YieldsTransactionPage")}
+        disabled={disabled}
+      >
+        <Text style={[styles.buttonText, disabled && styles.disabledText]}>
+          Yield Center
         </Text>
       </TouchableOpacity>
     </View>

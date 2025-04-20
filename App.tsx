@@ -12,6 +12,7 @@ import LostItemUploadScreen from "./screens/HomeComponents/LostItemUploadScreen"
 import FoundItemUploadScreen from "./screens/HomeComponents/FoundItemUploadScreen";
 import TransactionPage from "./screens/HomeComponents/TransactionPage";
 import TransactionScreen from "./screens/HomeComponents/TransactionScreen";
+import YieldsTransactionPage from "./screens/HomeComponents/YieldsTransactionPage";
 import ClaimedItems from "./screens/HomeComponents/ClaimedItems";
 import ClaimDetailsScreen from "./screens/HomeComponents/ClaimDetailsScreen";
 import ChatScreen from "./screens/HomeComponents/ChatScreen";
@@ -37,6 +38,7 @@ export type RootStackParamList = {
   FoundItemUploadScreen: undefined;
   TransactionPage: undefined;
   TransactionScreen: { claim: any };
+  YieldsTransactionPage: undefined;
   ClaimedItems: undefined;
   ClaimDetailsScreen: { claim: any; incoming: boolean };
   ListOfFoundItems: undefined;
@@ -73,6 +75,7 @@ const App = () => {
         <Stack.Screen name="FoundItemUploadScreen" component={FoundItemUploadScreen} />
         <Stack.Screen name="TransactionPage" component={TransactionPage} />
         <Stack.Screen name="TransactionScreen" component={TransactionScreen} />
+        <Stack.Screen name="YieldsTransactionPage" component={YieldsTransactionPage} />
         <Stack.Screen name="ClaimedItems" component={ClaimedItems} />
         <Stack.Screen name="ClaimDetailsScreen" component={ClaimDetailsScreen} />
         <Stack.Screen

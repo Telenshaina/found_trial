@@ -8,6 +8,16 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "types": ["@react-navigation/native", "@react-navigation/stack", "@react-navigation/bottom-tabs", "@react-native-community/datetimepicker", "react-native"]
-  }
+    "types": [
+      "@react-navigation/native",
+      "@react-navigation/stack",
+      "@react-navigation/bottom-tabs",
+      "@react-native-community/datetimepicker",
+      "react-native"
+    ]
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx"
+  ]
 }

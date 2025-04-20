@@ -6,7 +6,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../../supabase';
 
-const LostItemDetailScreen = ({ route }: { route: any }) => {
+const LostItemDetailsScreen = ({ route }: { route: any }) => {
   const { item } = route.params;
   const navigation = useNavigation();
 
@@ -478,4 +478,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default LostItemDetailScreen;
+export default LostItemDetailsScreen;

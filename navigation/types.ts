@@ -13,6 +13,7 @@ export type RootStackParamList = {
   FoundItemDetails: { item: any };
   LostItemDetails: { item: any };
   TransactionPage: undefined;
+  YieldsTransactionPage:{yield: any}
   TransactionScreen: {claim: any}
   ClaimedItems: undefined;
   ClaimDetailsScreen: { claim: any; incoming: boolean };

@@ -38,7 +38,7 @@ const QuickActions: React.FC<QuickActionsProps> = ({ disabled }) => {
         disabled={disabled}
       >
         <Text style={[styles.buttonText, disabled && styles.disabledText]}>
-          Claim Center
+          Found Item Center
         </Text>
       </TouchableOpacity>
 
@@ -48,7 +48,7 @@ const QuickActions: React.FC<QuickActionsProps> = ({ disabled }) => {
         disabled={disabled}
       >
         <Text style={[styles.buttonText, disabled && styles.disabledText]}>
-          Yield Center
+          Lost Item Center
         </Text>
       </TouchableOpacity>
     </View>

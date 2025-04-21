@@ -17,6 +17,7 @@ const TransactionPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [index, setIndex] = useState(0);
   const [routes] = useState([
+    { key: "foundItems", title: "Your Found Items" },
     { key: "userClaims", title: "Your Claims" },
     { key: "incomingClaims", title: "Incoming Claims" },
   ]);
@@ -119,6 +120,12 @@ const TransactionPage: React.FC = () => {
     }, [])
   );
 
+  const renderFoundItems = () => (
+      <View style={styles.blankContainer}>
+        <Text style={styles.blankText}>No lost items yet.</Text>
+      </View>
+    );
+
   const renderUserClaims = () => (
     loading ? <ActivityIndicator size="large" color="#007AFF" /> : userClaims.length === 0 ? (
       <Text style={styles.noTransactions}>No claims found.</Text>
@@ -174,22 +181,57 @@ const TransactionPage: React.FC = () => {
   );
 
   const renderScene = SceneMap({
+    foundItems: renderFoundItems,
     userClaims: renderUserClaims, 
     incomingClaims: renderIncomingClaims,
   });
 
+
+   const renderDescription = () => {
+      if (index === 0) {
+        return (
+          <View style={styles.descriptionContainer}>
+            <Text style={styles.boldText}>Found something?</Text>
+            <Text style={styles.descriptionText}>
+              This section shows all your reported Found items. Track their status and wait for someone to claim them!
+            </Text>
+          </View>
+        );
+      } else if (index === 1) {
+        return (
+          <View style={styles.descriptionContainer}>
+            <Text style={styles.boldText}>You are claiming an Item!</Text>
+            <Text style={styles.descriptionText}>
+              Track your claim status here whether the founder has accepted your claim!
+            </Text>
+          </View>
+        );
+      } else if (index === 2) {
+        return (
+          <View style={styles.descriptionContainer}>
+            <Text style={styles.boldText}>Someone is trying to claim their Item!</Text>
+            <Text style={styles.descriptionText}>
+              Here are the incoming claims from users who wants to claim their item. Help others by returning what they’ve lost!
+            </Text>
+          </View>
+        );
+      }
+    };
   return (
     <View style={styles.container}>
       <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
         <Ionicons name='arrow-back' size={24} color='black' />
       </TouchableOpacity>
       
+      <Text style={styles.title}>Found Items Center</Text>
+
       <TabView
         navigationState={{ index, routes }}
         renderScene={renderScene}
         onIndexChange={setIndex}
         initialLayout={{ width: layout.width }}
         renderTabBar={(props) => (
+          <View>
           <TabBar
             {...props}
             indicatorStyle={{ backgroundColor: 'black' }}
@@ -197,6 +239,11 @@ const TransactionPage: React.FC = () => {
             activeColor="black"
             inactiveColor="gray"
           />
+          {/* Description inside the TabBar, below the tabs */}
+            <View style={styles.descriptionContainer}>
+            {renderDescription()}
+            </View>
+            </View>
         )}
       />
     </View>
@@ -207,7 +254,14 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, backgroundColor: "#fff" },
   backButton: { marginBottom: 20 },
   backText: { fontSize: 16, color: "#007AFF" },
-  title: { fontSize: 24, fontWeight: "bold", marginBottom: 20 },
+  title: {
+    textAlign: "center",
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 10,
+    color: "black",
+  },
+
   noTransactions: { textAlign: "center", fontSize: 16, color: "#888", marginTop: 15 },
   transactionCard: {
     backgroundColor: "#f0f0f0",
@@ -226,6 +280,33 @@ const styles = StyleSheet.create({
   statusText: { color: "#fff", fontWeight: "bold", fontSize: 12 },
   tabContent: { padding: 20 },
   tabLabel: { color: "#000", fontWeight: "bold", backgroundColor: "#f9f9f9" },
+  descriptionContainer: {
+    padding: 15,
+    backgroundColor: "#f9f9f9",
+    alignItems: "center", 
+  },
+  
+  boldText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    textAlign: "center", 
+    marginBottom: 5,  
+  },
+  descriptionText: {
+    fontSize: 14,
+    color: "#555",
+    textAlign: "center",  
+  },
+
+  blankContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  blankText: {
+    fontSize: 16,
+    color: "#888",
+  },
 });
 
 export default TransactionPage;

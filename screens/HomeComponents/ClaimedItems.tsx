@@ -91,6 +91,8 @@ const ClaimedItems: React.FC = () => {
       <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
         <Icon name='arrow-back' size={24} color='black' />
       </TouchableOpacity>
+       <Text style={styles.title}>Claimed Items</Text>
+      
 
       <TabView
         navigationState={{ index, routes }}
@@ -114,6 +116,13 @@ const ClaimedItems: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, backgroundColor: "#fff" },
   backButton: { marginBottom: 20 },
+  title: {
+    textAlign: "center",
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 10,
+    color: "black",
+  },
   backText: { fontSize: 16, color: "#007AFF" },
   tabContent: { padding: 20 },
   itemCard: { backgroundColor: "#f0f0f0", padding: 15, borderRadius: 10, marginBottom: 10 },

@@ -30,6 +30,7 @@ const ListOfFoundItems: React.FC = () => {
       const { data, error } = await supabase
         .from('found_items')
         .select('*')
+        .not('status', 'eq', 'Claimed')
         .order('date_found', { ascending: false });
   
       if (error) {

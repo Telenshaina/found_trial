@@ -30,19 +30,20 @@ const FoundItems: React.FC<Props> = ({ disabled }) => {
         const { data, error } = await supabase
           .from('found_items')
           .select('*')
+          .not('status', 'eq', 'Claimed')  // Filter out items with status 'Claimed'
           .order('date_found', { ascending: false });
-
+    
         if (error) throw error;
-
+    
         if (!data || data.length === 0) {
           console.log('No found items retrieved from database.');
           setItems([]);
           setLoading(false);
           return;
         }
-
+    
         console.log('Fetched found items:', data);
-
+    
         const foundByIds = data.map(item => item.found_by);
         
         // Fetch institutional users
@@ -50,28 +51,28 @@ const FoundItems: React.FC<Props> = ({ disabled }) => {
           .from('institutional_users')
           .select('id, role')
           .in('id', foundByIds);
-
+    
         if (institutionalError) console.error('Error fetching institutional users:', institutionalError);
-
+    
         // Fetch guest users
         const { data: guestUsers, error: guestError } = await supabase
           .from('guest_users')
           .select('id')
           .in('id', foundByIds);
-
+    
         if (guestError) console.error('Error fetching guest users:', guestError);
-
+    
         const itemsWithSource = data.map(item => {
           const isInstitutional = institutionalUsers?.find(u => u.id === item.found_by);
           const isGuest = guestUsers?.find(g => g.id === item.found_by);
-
+    
           return {
             ...item,
             userType: isInstitutional ? 'Institutional' : isGuest ? 'Guest' : 'Unknown',
             role: isInstitutional?.role ?? null,
           };
         });
-
+    
         console.log('Processed items:', itemsWithSource);
         setItems(itemsWithSource);
       } catch (error) {
@@ -81,6 +82,7 @@ const FoundItems: React.FC<Props> = ({ disabled }) => {
         setLoading(false);
       }
     };
+    
 
     fetchItems();
   }, []);

@@ -6,6 +6,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../navigation/types";
 import { supabase } from "../../supabase";
 import { Ionicons } from "@expo/vector-icons";
+import { FlatList, Image } from "react-native";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, "TransactionPage">;
 
@@ -21,6 +22,8 @@ const TransactionPage: React.FC = () => {
     { key: "userClaims", title: "Your Claims" },
     { key: "incomingClaims", title: "Incoming Claims" },
   ]);
+  const [userFoundItems, setUserFoundItems] = useState<any[]>([]);
+
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -62,13 +65,16 @@ const TransactionPage: React.FC = () => {
 
     // Fetch incoming claims (claims on items uploaded by this user)
     const { data: itemsUploadedRaw, error: uploadError } = await supabase
-            .from("found_items")
-            .select("item_id, item_name")
-            .eq("found_by", user.id);
+        .from("found_items")
+        .select("*")  // fetch more fields
+        .eq("found_by", user.id);
 
-            if (uploadError) {
-            console.error("Error fetching uploaded items:", uploadError);
-            }
+      if (uploadError) {
+        console.error("Error fetching uploaded items:", uploadError);
+      } else {
+        setUserFoundItems(itemsUploadedRaw ?? []);
+      }
+
     
     const itemsUploaded = itemsUploadedRaw ?? [];
     const itemIds = itemsUploaded?.map((item) => item.item_id) || [];
@@ -120,11 +126,54 @@ const TransactionPage: React.FC = () => {
     }, [])
   );
 
-  const renderFoundItems = () => (
-      <View style={styles.blankContainer}>
-        <Text style={styles.blankText}>No lost items yet.</Text>
-      </View>
+ 
+  const renderFoundItems = () => {
+    const numColumns = 5;
+    const itemSize = (layout.width - 48) / numColumns;
+  
+    const renderItem = ({ item }: { item: any }) => (
+      <TouchableOpacity
+        style={[styles.card, { width: itemSize }]}
+        onPress={() => navigation.navigate("FoundItemDetails", { item })}
+      >
+        {item.image_url ? (
+          <Image source={{ uri: item.image_url }} style={styles.image} />
+        ) : (
+          <View style={styles.imagePlaceholder}>
+            <Text style={styles.placeholderText}>No Image</Text>
+          </View>
+        )}
+        <View style={styles.details}>
+          {item.userType === "Guest" && (
+            <Text style={styles.guestTag}>Posted by Guest</Text>
+          )}
+          <Text style={styles.itemTitle}>{item.item_name}</Text>
+          <Text style={styles.date}>
+            {new Date(item.date_found).toLocaleDateString()}
+          </Text>
+        </View>
+      </TouchableOpacity>
     );
+  
+    return loading ? (
+      <ActivityIndicator size="large" color="#000" />
+    ) : userFoundItems.length === 0 ? (
+      <Text style={styles.noTransactions}>No items reported by you yet.</Text>
+    ) : (
+      <FlatList
+        data={userFoundItems}
+        renderItem={renderItem}
+        keyExtractor={(item, index) => index.toString()}
+        numColumns={numColumns}
+        contentContainerStyle={styles.list}
+        scrollEnabled={true}
+        showsVerticalScrollIndicator={false}
+      />
+    );
+  };
+  
+
+  
 
     const renderUserClaims = () => (
       loading ? <ActivityIndicator size="large" color="#007AFF" /> : userClaims.length === 0 ? (
@@ -287,7 +336,7 @@ const TransactionPage: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: "#fff" },
+  
   backButton: { marginBottom: 20 },
   backText: { fontSize: 16, color: "#007AFF" },
   title: {
@@ -305,6 +354,69 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 10,
   },
+  container: {
+    flex: 1,
+    padding: 16,
+    backgroundColor: "#fff",
+  },
+  list: {
+    paddingBottom: 24,
+    paddingHorizontal: 8,
+  },
+  
+  card: {
+    margin: 8,
+    borderRadius: 8,
+    overflow: "hidden",
+    backgroundColor: "#fff",
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  image: {
+    width: "100%",
+    height: 120,
+    backgroundColor: "#f1f5f9",
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+  },
+  imagePlaceholder: {
+    width: "100%",
+    height: 120,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#ddd",
+  },
+  placeholderText: {
+    fontSize: 14,
+    color: "#555",
+  },
+  details: {
+    padding: 8,
+  },
+  itemTitle: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  date: {
+    fontSize: 12,
+    color: "#666",
+  },
+  guestTag: {
+    backgroundColor: "#FFD700",
+    color: "#333",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    fontSize: 10,
+    fontWeight: "bold",
+    alignSelf: "flex-start",
+    marginTop: 4,
+  },
+  
+  
   txTitle: { fontSize: 18, fontWeight: "600", marginBottom: 5 },
   statusTag: {
     alignSelf: "flex-start",

@@ -6,6 +6,8 @@ import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../navigation/types";
 import { supabase } from "../../supabase";
+import { Image } from 'react-native';
+
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, "ClaimedItems">;
 
@@ -25,6 +27,7 @@ const ClaimedItems: React.FC = () => {
 
   const fetchClaimedItems = async () => {
     setLoading(true);
+  
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
       console.error("User fetch error:", userError);
@@ -32,34 +35,85 @@ const ClaimedItems: React.FC = () => {
       return;
     }
     setUserId(user.id);
-
-    const { data, error } = await supabase
-      .from("found_items")
-      .select("*")
-      .eq("status", "Claimed");
-    
-    if (error) {
-      console.error("Error fetching claimed items:", error);
-    } else {
-      setClaimedItems(data || []);
-      setUserClaimedItems((data || []).filter(item => item.claimer_id === user.id));
+  
+    const [foundItemsRes, claimsRes, returnsRes] = await Promise.all([
+      supabase.from("found_items").select("*").eq("status", "Claimed"),
+      supabase.from("claims").select("*"),
+      supabase.from("proof_of_return").select("*"),
+    ]);
+  
+    if (foundItemsRes.error || claimsRes.error || returnsRes.error) {
+      console.error("Error fetching data", foundItemsRes.error || claimsRes.error || returnsRes.error);
+      setLoading(false);
+      return;
     }
+  
+    const foundItems = foundItemsRes.data || [];
+    const claims = claimsRes.data || [];
+    const returns = returnsRes.data || [];
+  
+    const enrichedItems = foundItems.map(item => {
+      const claim = claims.find(c => c.item_id === item.item_id); // match item_id
+      const returnProof = claim ? returns.find(r => r.claim_id === claim.claim_id) : null;
+  
+      return {
+        ...item,
+        claimed_date: returnProof?.date || null, // use proper returnProof field
+        claimer_id: claim?.user_id || null,      // needed for filtering "Your Claimed Items"
+      };
+    });
+  
+    setClaimedItems(enrichedItems);
+    setUserClaimedItems(enrichedItems.filter(item => item.claimer_id === user.id));
     setLoading(false);
   };
-
+  
   useFocusEffect(
     React.useCallback(() => {
       fetchClaimedItems();
     }, [])
   );
-
+  
   const renderClaimCard = (item: any) => (
-    <View key={item.id} style={styles.itemCard}>
-      <Text style={styles.itemTitle}>{item.item_name}</Text>
-      <Text>Status: {item.status}</Text>
-      <Text>Date Claimed: {new Date(item.claimed_at).toLocaleDateString()}</Text>
-    </View>
+    <TouchableOpacity
+      key={item.item_id}
+      style={[
+        styles.itemCard,
+        { backgroundColor: index === 0 ? "#d5f2cb" : "#FFF3E6" } // Light blue for all claims, light orange for your claims
+      ]}
+      onPress={() => {
+        if (index === 0) {
+          navigation.navigate("FoundItemDetails", { item });
+        } else {
+          navigation.navigate("ClaimDetailsScreen", { claim: item, incoming: false });
+        }
+      }}
+    >
+      <View style={styles.cardContent}>
+        {/* Left side: text */}
+        <View style={styles.cardText}>
+          <Text style={[styles.itemTitle, { color: "#333" }]}>{item.item_name}</Text>
+          <Text style={{ color: "#666" }}>Status: {item.status}</Text>
+          <Text style={{ color: "#666" }}>
+            Date Claimed: {item.claimed_date
+              ? new Date(item.claimed_date).toLocaleDateString()
+              : "N/A"}
+          </Text>
+        </View>
+  
+        {/* Right side: image */}
+        {item.image_url && (
+          <Image
+            source={{ uri: item.image_url }}
+            style={styles.itemImage}
+            resizeMode="cover"
+          />
+        )}
+      </View>
+    </TouchableOpacity>
   );
+  
+  
 
   const renderAllClaims = () => (
     loading ? <ActivityIndicator size="large" color="#007AFF" /> : claimedItems.length === 0 ? (
@@ -123,6 +177,24 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     color: "black",
   },
+  cardContent: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  
+  cardText: {
+    flex: 1,
+    paddingRight: 10,
+  },
+  
+  itemImage: {
+    width: 70,
+    height: 70,
+    borderRadius: 8,
+    backgroundColor: "#ccc",
+  },
+  
   backText: { fontSize: 16, color: "#007AFF" },
   tabContent: { padding: 20 },
   itemCard: { backgroundColor: "#f0f0f0", padding: 15, borderRadius: 10, marginBottom: 10 },

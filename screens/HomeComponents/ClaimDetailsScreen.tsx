@@ -73,7 +73,7 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
     ]);
   };
 
-  // This will change the item's status to claimed in the foundy_items table
+  // This will change the item's status to claimed in the found_items table
   const handleFinderConfirm = async () => {
     try {
       const { error } = await supabase
@@ -288,78 +288,39 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
             </Text>
           </TouchableOpacity>
         )}
-
-{claimStatus && ['approved', 'claimed'].includes(claimStatus) && (
-  <TouchableOpacity
-    onPress={() => navigation.navigate('TransactionScreen', { claim })}
-    disabled={claimStatus === 'pending' || claimStatus === 'rejected'}
-    style={[styles.actionButton, { backgroundColor: '#ff9500' }]}
-  >
-    <Text style={styles.actionButtonText}>
-      <Icon2 name="search" size={18} color="#fff" /> View Transaction Process
-    </Text>
-  </TouchableOpacity>
-)}
-
-
+    
+        {claimStatus && ['approved', 'claimed'].includes(claimStatus) && (
+          <TouchableOpacity
+            onPress={() => navigation.navigate('TransactionScreen', { claim })}
+            disabled={claimStatus === 'pending' || claimStatus === 'rejected'}
+            style={[styles.actionButton, { backgroundColor: '#ff9500' }]}
+          >
+            <Text style={styles.actionButtonText}>
+              <Icon2 name="search" size={18} color="#fff" /> View Transaction Process
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {incoming && (claim.status.toLowerCase() === 'pending'|| claim.status.toLowerCase() === 'claimed') && (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
           <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: '#FF4C4C' }]}
-            onPress={() => handleStatusUpdate('rejected')}
+            style={[styles.actionButton, { backgroundColor: '#28a745' }]}
+            onPress={confirmReceived}
+            disabled={claimStatus === 'pending' || claimStatus === 'rejected'}
           >
-            <Text style={styles.actionButtonText}>
-              <Icon name='x' size={18} color='#fff' />  Reject
-            </Text>
+            <Text style={styles.actionButtonText}>Confirm Item Received</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: '#34c759' }]}
-            onPress={() => handleStatusUpdate('approved')}
+            style={[styles.actionButton, { backgroundColor: '#dc3545' }]}
+            onPress={handleDeleteClaim}
+            disabled={claimStatus === 'claimed'}
           >
-            <Text style={styles.actionButtonText}>
-              <Icon name='check' size={18} color='#fff' />  Approve
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#c82333'}]} onPress={handleDeleteClaim}>
-            <Text style={styles.actionButtonText}>
-              <Icon name='trash' size={18} color='#fff' />  Delete Claim</Text>
+            <Text style={styles.actionButtonText}>Delete Claim</Text>
           </TouchableOpacity>
         </View>
       )}
-
-      <Modal visible={modalVisible} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>
-              {actionType === 'finder' ? 'Confirm Return' : 'Confirm Received'}
-            </Text>
-            <Text style={styles.modalMessage}>Are you sure you want to proceed?</Text>
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity 
-                style={[styles.modalButton, { backgroundColor: '#FF4C4C' }]} 
-                onPress={() => setModalVisible(false)}
-              >
-                <Text style={styles.modalButtonText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={[styles.modalButton, { backgroundColor: '#4CAF50' }]} 
-                onPress={() => {
-                  setModalVisible(false);
-                  actionType === 'finder' ? confirmReturn() : confirmReceived();
-                }}
-              >
-                <Text style={styles.modalButtonText}>Confirm</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </ScrollView>
   );
 };
@@ -367,93 +328,48 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    padding: 20,
-    backgroundColor: '#fff',
-    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
   },
-  backButton: { alignSelf: 'flex-start', marginBottom: 20 },
-  backText: { fontSize: 16, color: '#007AFF' },
-  title: { fontSize: 28, fontWeight: '700', marginBottom: 24, textAlign: 'center', color: '#333' },
+  backButton: {
+    marginTop: 20,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginVertical: 10,
+  },
   detailCard: {
-    backgroundColor: '#f5f5f5',
-    padding: 24,
-    borderRadius: 16,
-    width: '100%',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 20,
+    marginBottom: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-    alignItems: 'center',
-    marginBottom: 30,
+    shadowRadius: 10,
   },
-  label: { fontSize: 14, fontWeight: '600', marginTop: 12, alignSelf: 'flex-start' },
-  value: { fontSize: 16, marginTop: 4, alignSelf: 'flex-start' },
+  label: {
+    fontWeight: 'bold',
+    marginVertical: 5,
+  },
+  value: {
+    marginBottom: 10,
+  },
   proofImage: {
-    width: '100%',
+    width: 300,
     height: 200,
     borderRadius: 10,
-    marginTop: 12,
+    marginVertical: 10,
   },
   actionButton: {
     paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 20,
-    marginVertical: 8,
-    minWidth: '40%',
-    maxWidth: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexGrow: 2,
+    borderRadius: 8,
+    flex: 1,
+    marginVertical: 10,
   },
   actionButtonText: {
     color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Dark transparent overlay
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContainer: {
-    backgroundColor: '#fff',
-    width: '80%',
-    padding: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5, // For Android shadow effect
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  modalMessage: {
-    fontSize: 16,
-    marginBottom: 20,
     textAlign: 'center',
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-  },
-  modalButton: {
-    flex: 1,
-    paddingVertical: 10,
-    marginHorizontal: 5,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  modalButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
     fontSize: 16,
   },
 });

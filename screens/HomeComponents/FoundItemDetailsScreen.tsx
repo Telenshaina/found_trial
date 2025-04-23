@@ -65,17 +65,38 @@ const FoundItemDetailsScreen = ({ route }: { route: any }) => {
   useEffect(() => {
     const fetchUser = async () => {
       if (item.found_by) {
-        const { data, error } = await supabase
+        // First, try to fetch from institutional_users
+        let { data, error } = await supabase
           .from('institutional_users')
           .select('name')
           .eq('id', item.found_by)
           .single();
-
-        if (data) setFoundByUser(data.name);
-        if (error) console.error('Error fetching user:', error);
+    
+        if (data) {
+          setFoundByUser(data.name);  // Set the found_by user name
+        } else {
+          // If no institutional user found, try guest_users
+          const { data: guestData, error: guestError } = await supabase
+            .from('guest_users')
+            .select('name')
+            .eq('id', item.found_by)
+            .single();
+    
+          if (guestData) {
+            setFoundByUser(guestData.name);  // Set the guest user name
+          }
+          if (guestError) {
+            console.error('Error fetching guest user:', guestError);
+          }
+        }
+    
+        if (error) {
+          console.error('Error fetching institutional user:', error);
+        }
       }
     };
     fetchUser();
+    
   }, [item.found_by]);
   
     // Fetch user details and update state

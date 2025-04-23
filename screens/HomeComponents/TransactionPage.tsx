@@ -126,37 +126,34 @@ const TransactionPage: React.FC = () => {
       </View>
     );
 
-  const renderUserClaims = () => (
-    loading ? <ActivityIndicator size="large" color="#007AFF" /> : userClaims.length === 0 ? (
-      <Text style={styles.noTransactions}>No claims found.</Text>
-    ) : (
-      <ScrollView style={styles.tabContent}>
-        {userClaims.map((tx) => (
-          <TouchableOpacity key={tx.claim_id} style={styles.transactionCard}
-            onPress={() =>
-              navigation.navigate("Chat", {
-                claim_id: tx.claim_id, 
-                user_id: tx.user_id, 
-                uploader_id: tx.uploader_id, 
-                item_name: tx.item_name,
-              })
-            }>
+    const renderUserClaims = () => (
+      loading ? <ActivityIndicator size="large" color="#007AFF" /> : userClaims.length === 0 ? (
+        <Text style={styles.noTransactions}>No claims found.</Text>
+      ) : (
+        <ScrollView style={styles.tabContent}>
+          {userClaims.map((tx) => (
+            <TouchableOpacity key={tx.claim_id} style={styles.transactionCard}
+              onPress={() =>
+                navigation.navigate("ClaimDetailsScreen", {
+                  claim: tx,
+                  incoming: false  // since these are user's own claims
+                })
+              }>
               <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                 <Text style={styles.txTitle}>{tx.item_name}</Text>
                 <TouchableOpacity onPress={() => handleDelete(tx.claim_id)}>
                   <Ionicons name="trash-outline" size={20} color="#FF4C4C" />
                 </TouchableOpacity>
-              </View>
-
+              </View> 
               <View style={[styles.statusTag, { backgroundColor: getStatusColor(tx.status) }]}>
                 <Text style={styles.statusText}>{tx.status.toUpperCase()}</Text>
               </View>
               <Text>Date: {new Date(tx.created_at).toLocaleDateString()}</Text>
             </TouchableOpacity>
-        ))}
-      </ScrollView>
-    )
-  );
+          ))}
+        </ScrollView>
+      )
+    );
 
   const renderIncomingClaims = () => (
     loading ? <ActivityIndicator size="large" color="#007AFF" /> : incomingClaims.length === 0 ? (
@@ -168,17 +165,56 @@ const TransactionPage: React.FC = () => {
             onPress={() =>
               navigation.navigate("ClaimDetailsScreen", { claim: claim, incoming: true })
             }>
-              <Text style={styles.txTitle}>{claim.item_name}</Text>
-              <View style={[styles.statusTag, { backgroundColor: getStatusColor(claim.status) }]}>
-                <Text style={styles.statusText}>{claim.status.toUpperCase()}</Text>
-              </View>
-              <Text>Claimed by: {claim.user_id}</Text>
-              <Text>Date: {new Date(claim.created_at).toLocaleDateString()}</Text>
-            </TouchableOpacity>
+            <Text style={styles.txTitle}>{claim.item_name}</Text>
+            <View style={[styles.statusTag, { backgroundColor: getStatusColor(claim.status) }]} >
+              <Text style={styles.statusText}>{claim.status.toUpperCase()}</Text>
+            </View>
+            {/* Fetch the name from the appropriate table (institutional_users or guest_users) */}
+            {claim.user_id && (
+              <FetchUserName userId={claim.user_id} />
+            )}
+            <Text>Date: {new Date(claim.created_at).toLocaleDateString()}</Text>
+          </TouchableOpacity>
         ))}
       </ScrollView>
     )
   );
+  
+  // Component to fetch and display the user's name based on the user_id
+  const FetchUserName = ({ userId }: { userId: string }) => {
+    const [userName, setUserName] = useState<string | null>(null);
+  
+    useEffect(() => {
+      const fetchUserName = async () => {
+        // First, try fetching from institutional_users
+        let { data, error } = await supabase
+          .from("institutional_users")
+          .select("name")
+          .eq("id", userId)
+          .single();
+  
+        // If not found, fetch from guest_users
+        if (error || !data) {
+          ({ data, error } = await supabase
+            .from("guest_users")
+            .select("name")
+            .eq("id", userId)
+            .single());
+        }
+  
+        if (error) {
+          console.error("Error fetching user name:", error);
+        } else {
+          setUserName(data?.name || "Unknown User");
+        }
+      };
+  
+      fetchUserName();
+    }, [userId]);
+  
+    return <Text>Claimed by: {userName || "Loading..."}</Text>;
+  };
+  
 
   const renderScene = SceneMap({
     foundItems: renderFoundItems,

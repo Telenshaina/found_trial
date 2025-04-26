@@ -31,6 +31,8 @@ const Chat = () => {
   const [userClaims, setUserClaims] = useState<any[]>([]);
   const [incomingClaims, setIncomingClaims] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [userNames, setUserNames] = useState<{ [key: string]: string }>({});
+
 
   const params: any = route.params;
   const uploaderContact = contacts.find((c) => c.id === params?.uploader_id);
@@ -72,85 +74,153 @@ const Chat = () => {
 
   const fetchTransactions = async () => {
     setLoading(true);
-
+  
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
       console.error("User not found:", userError);
       setLoading(false);
       return;
     }
-
+  
     const { data: userClaimsData, error: userClaimsError } = await supabase
       .from("claims")
-      .select("*,  found_items(item_name)")
+      .select("*, found_items(item_id)")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
-
+  
     if (userClaimsError) {
       console.error("Error fetching user claims:", userClaimsError);
     } else {
       const userClaimsWithMessages = await Promise.all(
         (userClaimsData || []).map(async (claim) => {
+          // Fetch messages for each claim
           const messages = await fetchMessagesForClaim(claim.claim_id.toString());
+      
+          // Fetch item name based on item_id from found_items table
+          const { data: foundItemData, error: foundItemError } = await supabase
+            .from("found_items")
+            .select("item_name")
+            .eq("item_id", claim.item_id)
+            .single();
+      
+          const itemName = foundItemData?.item_name || "Unknown Item";
+      
+          // 👇 NEW: Get the name of the person who found the item (found_by)
+          const uploaderName = await getUserName(claim.found_by);
+      
+          setUserNames((prev) => ({ ...prev, [claim.found_by]: uploaderName }));
+      
           if (messages.length > 0) {
             return {
               ...claim,
+              item_name: itemName,
+              uploader_id: claim.found_by, // 👈 this will be passed to ChatScreen
               messages,
             };
           }
           return null;
         })
-      );
+      );      
       setUserClaims(userClaimsWithMessages.filter((claim) => claim !== null));
     }
-
+  
+    // Handle incoming claims (similar logic)
     const { data: itemsUploadedRaw, error: uploadError } = await supabase
       .from("found_items")
       .select("item_id, item_name")
       .eq("found_by", user.id);
-
+  
     if (uploadError) {
       console.error("Error fetching uploaded items:", uploadError);
     }
-
+  
     const itemsUploaded = itemsUploadedRaw ?? [];
     const itemIds = itemsUploaded?.map((item) => item.item_id) || [];
-
+  
     if (itemIds.length > 0) {
       const { data: incomingClaimsData } = await supabase
         .from("claims")
         .select("*")
         .in("item_id", itemIds)
         .order("created_at", { ascending: false });
-
+  
       const incomingClaimsWithMessages = await Promise.all(
         (incomingClaimsData || []).map(async (claim) => {
+          // Fetch messages for each incoming claim
           const messages = await fetchMessagesForClaim(claim.claim_id.toString());
+  
+          // Fetch item name from found_items based on item_id
+          const { data: foundItemData, error: foundItemError } = await supabase
+            .from("found_items")
+            .select("item_name")
+            .eq("item_id", claim.item_id)
+            .single();
+  
+          if (foundItemError || !foundItemData) {
+            console.error("Error fetching item name:", foundItemError);
+          }
+  
+          const itemName = foundItemData ? foundItemData.item_name : "Unknown Item";
+  
           const item = itemsUploaded.find((item) => item.item_id === claim.item_id);
+          const userName = await getUserName(claim.user_id);
+          setUserNames((prevNames) => ({ ...prevNames, [claim.user_id]: userName }));
+  
           if (messages.length > 0) {
             return {
               ...claim,
-              item_name: item?.item_name || "Unknown Item", // default fallback
+              item_name: itemName, // Add fetched item_name
               messages,
             };
           }
           return null;
         })
       );
-
+  
       setIncomingClaims(incomingClaimsWithMessages.filter((claim) => claim !== null));
     } else {
       setIncomingClaims([]);
     }
-
+  
     setLoading(false);
   };
+  
 
   useEffect(() => {
     fetchTransactions();
   }, []);
 
-  const handleClaimPress = (claim: any) => {
+  const getUserName = async (userId: string) => {
+    let { data: institutionalUser, error: institutionalError } = await supabase
+      .from('institutional_users')
+      .select('name')
+      .eq('id', userId)
+      .single();
+  
+    if (institutionalError || !institutionalUser) {
+      const { data: guestUser, error: guestError } = await supabase
+        .from('guest_users')
+        .select('name')
+        .eq('id', userId)
+        .single();
+  
+      if (guestError || !guestUser) {
+        return 'N/A';
+      }
+  
+      setUserNames((prevNames) => ({ ...prevNames, [userId]: guestUser.name }));
+      return guestUser.name;
+    }
+  
+    setUserNames((prevNames) => ({ ...prevNames, [userId]: institutionalUser.name }));
+    return institutionalUser.name;
+  };
+  
+  
+  const handleClaimPress = async (claim: any) => {
+    // Fetch the user name asynchronously
+    const userName = await getUserName(claim.user_id);
+
     navigation.navigate("ChatScreen", {
       claim_id: claim.claim_id.toString(),
       user_id: params?.user_id,
@@ -197,13 +267,27 @@ const Chat = () => {
                   </Text>
                 </View>
                 <Text style={[styles.transactionText, { fontSize: 12 }]}>
-                  Claimer ID: {item.user_id || "N/A"}
+                <>
+                {userNames[item.user_id] && (
+                  <>Claimer Name: {userNames[item.user_id]}<br /></>
+                )}
+                {userNames[item.found_by] && (
+                  <>Founder Name: {userNames[item.found_by]}</>
+                )}
+              </>
+
                 </Text>
                 <Text style={[styles.transactionText, { fontSize: 12 }]}>
-                  {params?.user_id === item.user_id
-                    ? "You are the claimer"
-                    : "Wants to claim your item"}
-                </Text>
+  {userNames[item.found_by] ? (
+    <>You claimed an item</>
+  ) : (
+    <>
+      {params?.user_id === item.user_id
+        ? "You are the claimer"
+        : "Wants to claim your item"}
+    </>
+  )}
+</Text>
               </View>
             </TouchableOpacity>
           )}

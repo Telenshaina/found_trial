@@ -127,50 +127,40 @@ const TransactionPage: React.FC = () => {
   );
 
  
-  const renderFoundItems = () => {
-    const numColumns = 5;
-    const itemSize = (layout.width - 48) / numColumns;
-  
-    const renderItem = ({ item }: { item: any }) => (
-      <TouchableOpacity
-        style={[styles.card, { width: itemSize }]}
-        onPress={() => navigation.navigate("FoundItemDetails", { item })}
-      >
-        {item.image_url ? (
-          <Image source={{ uri: item.image_url }} style={styles.image} />
-        ) : (
-          <View style={styles.imagePlaceholder}>
-            <Text style={styles.placeholderText}>No Image</Text>
-          </View>
-        )}
-        <View style={styles.details}>
-          {item.userType === "Guest" && (
-            <Text style={styles.guestTag}>Posted by Guest</Text>
-          )}
-          <Text style={styles.itemTitle}>{item.item_name}</Text>
-          <Text style={styles.date}>
-            {new Date(item.date_found).toLocaleDateString()}
-          </Text>
+  const renderFoundItems = () => (
+    <View style={styles.tabContainer}>
+      {loading ? (
+        <ActivityIndicator size="large" color="black" />
+      ) : userFoundItems.length === 0 ? (
+        <View style={styles.blankContainer}>
+          <Text style={styles.blankText}>No found items reported yet.</Text>
         </View>
-      </TouchableOpacity>
-    );
+      ) : (
+        <FlatList
+          data={userFoundItems}
+          keyExtractor={(item) => item.item_id.toString()}
+          contentContainerStyle={styles.cardListContainer}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={styles.itemCard}
+              onPress={() => navigation.navigate("FoundItemDetails", { item })}
+            >
+              {item.image_url && (
+                <Image source={{ uri: item.image_url }} style={styles.itemImage} />
+              )}
+              <View style={styles.itemInfo}>
+                <Text style={styles.itemName}>{item.item_name}</Text>
+                <Text style={styles.itemCategory}>{item.category}</Text>
+                <Text style={styles.itemDescription}>{item.description}</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+        />
+      )}
+    </View>
+  );
   
-    return loading ? (
-      <ActivityIndicator size="large" color="#000" />
-    ) : userFoundItems.length === 0 ? (
-      <Text style={styles.noTransactions}>No items reported by you yet.</Text>
-    ) : (
-      <FlatList
-        data={userFoundItems}
-        renderItem={renderItem}
-        keyExtractor={(item, index) => index.toString()}
-        numColumns={numColumns}
-        contentContainerStyle={styles.list}
-        scrollEnabled={true}
-        showsVerticalScrollIndicator={false}
-      />
-    );
-  };
+  
   
 
   
@@ -335,126 +325,188 @@ const TransactionPage: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  
-  backButton: { marginBottom: 20 },
-  backText: { fontSize: 16, color: "#007AFF" },
-  title: {
-    textAlign: "center",
-    fontSize: 20,
-    fontWeight: "bold",
-    marginBottom: 10,
-    color: "black",
-  },
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      paddingTop: 50,
+      backgroundColor: "#fff",
+    },
+    backButton: {
+      position: "absolute",
+      top: 50,
+      left: 20,
+      zIndex: 10,
+      backgroundColor: "#f5f5f5",
+      padding: 8,
+      borderRadius: 20,
+    },
+    backText: {
+      fontSize: 16,
+      color: "#007AFF",
+    },
+    title: {
+      textAlign: "center",
+      fontSize: 20,
+      fontWeight: "bold",
+      marginBottom: 10,
+      color: "black",
+    },
+    noTransactions: {
+      textAlign: "center",
+      fontSize: 16,
+      color: "#888",
+      marginTop: 15,
+    },
+    transactionCard: {
+      backgroundColor: "#f0f0f0",
+      padding: 15,
+      borderRadius: 10,
+      marginBottom: 10,
+    },
+    list: {
+      paddingBottom: 24,
+      paddingHorizontal: 8,
+    },
+    card: {
+      margin: 8,
+      borderRadius: 8,
+      overflow: "hidden",
+      backgroundColor: "#fff",
+      elevation: 3,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+    },
+    image: {
+      width: "100%",
+      height: 120,
+      backgroundColor: "#f1f5f9",
+      borderTopLeftRadius: 8,
+      borderTopRightRadius: 8,
+    },
+    details: {
+      padding: 8,
+    },
+    itemTitle: {
+      fontSize: 14,
+      fontWeight: "500",
+    },
+    date: {
+      fontSize: 12,
+      color: "#666",
+    },
+    txTitle: {
+      fontSize: 18,
+      fontWeight: "600",
+      marginBottom: 5,
+    },
+    statusTag: {
+      alignSelf: "flex-start",
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 12,
+      marginBottom: 8,
+    },
+    statusText: {
+      color: "#fff",
+      fontWeight: "bold",
+      fontSize: 12,
+    },
+    tabContent: {
+      padding: 20,
+    },
+    tabLabel: {
+      color: "#000",
+      fontWeight: "bold",
+      backgroundColor: "#f9f9f9",
+    },
+    descriptionContainer: {
+      padding: 15,
+      backgroundColor: "#f9f9f9",
+      alignItems: "center",
+    },
+    boldText: {
+      fontSize: 16,
+      fontWeight: "bold",
+      textAlign: "center",
+      marginBottom: 5,
+    },
+    descriptionText: {
+      fontSize: 14,
+      color: "#555",
+      textAlign: "center",
+    },
+   
+    
 
-  noTransactions: { textAlign: "center", fontSize: 16, color: "#888", marginTop: 15 },
-  transactionCard: {
-    backgroundColor: "#f0f0f0",
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 10,
-  },
-  container: {
-    flex: 1,
-    padding: 16,
-    backgroundColor: "#fff",
-  },
-  list: {
-    paddingBottom: 24,
-    paddingHorizontal: 8,
-  },
+    imagePlaceholder: {
+      width: "100%",
+      height: 200,
+      backgroundColor: "#ddd",
+      justifyContent: "center",
+      alignItems: "center",
+      borderTopLeftRadius: 8,
+      borderTopRightRadius: 8,
+    },
+    placeholderText: {
+      fontSize: 14,
+      color: "#555",
+    },
+   
+    guestTag: {
+      fontSize: 10,
+      color: "gray",
+      marginBottom: 5,
+    },
   
-  card: {
-    margin: 8,
-    borderRadius: 8,
-    overflow: "hidden",
-    backgroundColor: "#fff",
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
-  image: {
-    width: "100%",
-    height: 120,
-    backgroundColor: "#f1f5f9",
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
-  },
-  imagePlaceholder: {
-    width: "100%",
-    height: 120,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#ddd",
-  },
-  placeholderText: {
-    fontSize: 14,
-    color: "#555",
-  },
-  details: {
-    padding: 8,
-  },
-  itemTitle: {
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  date: {
-    fontSize: 12,
-    color: "#666",
-  },
-  guestTag: {
-    backgroundColor: "#FFD700",
-    color: "#333",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    fontSize: 10,
-    fontWeight: "bold",
-    alignSelf: "flex-start",
-    marginTop: 4,
-  },
+    tabContainer: {
+      flex: 1,
+      backgroundColor: "#fff",
+      paddingHorizontal: 10,
+    },
+    blankContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    blankText: {
+      fontSize: 16,
+      color: "#777",
+    },
+    cardListContainer: {
+      paddingTop: 10,
+    },
+    itemCard: {
+      flexDirection: "row",
+      backgroundColor: "#f8f8f8",
+      borderRadius: 8,
+      marginBottom: 10,
+      padding: 10,
+    },
+    itemImage: {
+      width: 60,
+      height: 60,
+      borderRadius: 8,
+      marginRight: 15,
+    },
+    itemInfo: {
+      flex: 1,
+    },
+    itemName: {
+      fontSize: 16,
+      fontWeight: "bold",
+    },
+    itemCategory: {
+      fontSize: 14,
+      color: "#777",
+    },
+    itemDescription: {
+      fontSize: 12,
+      color: "#555",
+    },
+  });
   
-  
-  txTitle: { fontSize: 18, fontWeight: "600", marginBottom: 5 },
-  statusTag: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginBottom: 8,
-  },
-  statusText: { color: "#fff", fontWeight: "bold", fontSize: 12 },
-  tabContent: { padding: 20 },
-  tabLabel: { color: "#000", fontWeight: "bold", backgroundColor: "#f9f9f9" },
-  descriptionContainer: {
-    padding: 15,
-    backgroundColor: "#f9f9f9",
-    alignItems: "center", 
-  },
-  
-  boldText: {
-    fontSize: 16,
-    fontWeight: "bold",
-    textAlign: "center", 
-    marginBottom: 5,  
-  },
-  descriptionText: {
-    fontSize: 14,
-    color: "#555",
-    textAlign: "center",  
-  },
-
-  blankContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  blankText: {
-    fontSize: 16,
-    color: "#888",
-  },
-});
+ 
 
 export default TransactionPage;

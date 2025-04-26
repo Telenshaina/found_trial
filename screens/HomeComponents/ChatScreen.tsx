@@ -144,39 +144,83 @@ const ChatScreen = () => {
 
   const handleApprove = async () => {
     if (!claim_id || !userId) return;
-
+  
     try {
+      // 1. Update claim to approved
       let { error: claimError } = await supabase
         .from("claims")
         .update({ status: "approved" })
         .eq("claim_id", claim_id);
-
+  
       if (claimError) throw claimError;
-
+  
+      // 2. Get item_id and user_id of claimer
       let { data: claimData, error: claimFetchError } = await supabase
         .from("claims")
-        .select("item_id")
+        .select("item_id, user_id")
         .eq("claim_id", claim_id)
         .single();
-
+  
       if (claimFetchError || !claimData) throw claimFetchError;
-
+  
       const itemId = claimData.item_id;
-
+      const receiverId = claimData.user_id; // the person claiming the item
+  
+      // 3. Update item status
       let { error: itemError } = await supabase
         .from("found_items")
         .update({ status: "return_pending" })
         .eq("item_id", itemId);
-
+  
       if (itemError) throw itemError;
-
+  
+      // 4. Get sender's name from guest_users or institutional_users
+      let senderName = "Someone";
+  
+      const { data: guestData, error: guestError } = await supabase
+        .from("guest_users")
+        .select("name")
+        .eq("id", userId)
+        .single();
+  
+      if (guestData?.name) {
+        senderName = guestData.name;
+      } else {
+        const { data: institutionalData, error: institutionalError } = await supabase
+          .from("institutional_users")
+          .select("name")
+          .eq("id", userId)
+          .single();
+  
+        if (institutionalData?.name) {
+          senderName = institutionalData.name;
+        }
+      }
+  
+      // 5. Insert notification
+      const { error: notificationError } = await supabase
+        .from("notifications")
+        .insert([
+          {
+            receiver_id: receiverId,
+            sender_id: userId,
+            item_id: itemId,
+            message: `${senderName} has approved the claim for the item "${item_name}".`,
+            read: false,
+          },
+        ]);
+  
+      if (notificationError) throw notificationError;
+  
       alert("Claim approved! Proceed with returning the item.");
       setClaimStatus("approved");
+      setModalVisible(false); // close modal after approval
     } catch (error: any) {
-      console.error("Error approving claim:", error.message);
+      console.error("Error approving claim or inserting notification:", error.message);
       alert("Failed to approve claim. Try again.");
     }
   };
+  
 
   useEffect(() => {
     if (messages.length > 0) {

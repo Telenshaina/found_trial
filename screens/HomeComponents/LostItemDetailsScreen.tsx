@@ -49,19 +49,35 @@ const LostItemDetailsScreen = ({ route }: { route: any }) => {
   useEffect(() => {
     const fetchUser = async () => {
       if (item.posted_by) {
-        const { data, error } = await supabase
+        // Try fetching from institutional_users first
+        const { data: institutionalUser, error: institutionalError } = await supabase
           .from('institutional_users')
           .select('name')
           .eq('id', item.posted_by)
           .single();
-
-        if (data) setLostByUser(data.name);
-        if (error) console.error('Error fetching user:', error);
+  
+        if (institutionalUser) {
+          setLostByUser(institutionalUser.name);
+        } else {
+          // If not found, try fetching from guest_users
+          const { data: guestUser, error: guestError } = await supabase
+            .from('guest_users')
+            .select('name')
+            .eq('id', item.posted_by)
+            .single();
+  
+          if (guestUser) {
+            setLostByUser(guestUser.name);
+          } else {
+            console.error('Error fetching user:', institutionalError || guestError);
+          }
+        }
       }
     };
+  
     fetchUser();
   }, [item.posted_by]);
-
+  
   const handleButtonPress = () => {
     if (isOwner) {
       setStatusModalVisible(true);
@@ -144,7 +160,7 @@ const LostItemDetailsScreen = ({ route }: { route: any }) => {
       .insert([
         {
           user_id: authUserId,
-          item_id: item.id,
+          item_id: item.item_id,
           proof_url: proofUrl,
           description: proofData.identifyingInfo,
           status: 'pending',

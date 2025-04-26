@@ -64,13 +64,15 @@ const Notification = () => {
 
     // Navigate to claim details
     const { data: claim, error: claimError } = await supabase
-      .from("claims")
-      .select("*")
-      .eq("item_id", item_id)
-      .eq("found_by", receiver_id)
-      .eq("user_id", sender_id)
-      .limit(1)
-      .single();
+  .from("claims")
+  .select("*")
+  .or(
+    `and(found_by.eq.${receiver_id},user_id.eq.${sender_id}),and(found_by.eq.${sender_id},user_id.eq.${receiver_id})`
+  )
+  .eq("item_id", item_id)
+  .limit(1)
+  .maybeSingle();
+
 
     if (claimError || !claim) {
       Alert.alert("Claim not found", "Unable to find the claim details.");

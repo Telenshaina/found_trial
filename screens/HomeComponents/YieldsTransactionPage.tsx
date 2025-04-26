@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   FlatList,
   Image,
-  ActivityIndicator,
+  ActivityIndicator, Alert
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
@@ -135,6 +135,30 @@ const YieldsTransactionPage: React.FC = () => {
     }
   };
 
+  const handleDelete = (yieldId: number) => {
+    // Optional: show confirmation first
+    Alert.alert(
+      "Delete Item",
+      "Are you sure you want to delete this item?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            // Perform the delete logic here
+            const updatedYields = incomingYields.filter(item => item.yield_id !== yieldId);
+            setIncomingYields(updatedYields);
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+  
   const renderLostItems = () => (
     <View style={styles.tabContainer}>
       {loading ? (
@@ -169,7 +193,6 @@ const YieldsTransactionPage: React.FC = () => {
     </View>
   );
 
-
   const renderIncomingYields = () => (
     <View style={styles.tabContainer}>
       {loading ? (
@@ -187,17 +210,28 @@ const YieldsTransactionPage: React.FC = () => {
             <TouchableOpacity
               style={styles.itemCard}
               onPress={() => handleYieldPress(item)}
+              activeOpacity={0.8}
             >
               {item.proof_url && (
                 <Image source={{ uri: item.proof_url }} style={styles.itemImage} />
               )}
               <View style={styles.itemInfo}>
-                <Text style={styles.itemName}>Claim #{item.yield_id}</Text>
-                <Text
-                  style={[styles.itemCategory, { color: getStatusColor(item.status) }]}
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <Text style={styles.itemName}>Item #{item.item_id}</Text>
+                  <TouchableOpacity onPress={() => handleDelete(item.yield_id)}>
+                    <Ionicons name="trash-outline" size={20} color="#FF4C4C" />
+                  </TouchableOpacity>
+                </View>
+  
+                <View
+                  style={[
+                    styles.statusTag,
+                    { backgroundColor: getStatusColor(item.status) },
+                  ]}
                 >
-                  Status: {item.status}
-                </Text>
+                  <Text style={styles.statusText}>{item.status.toUpperCase()}</Text>
+                </View>
+  
                 <Text style={styles.itemDescription}>{item.description}</Text>
               </View>
             </TouchableOpacity>
@@ -206,6 +240,7 @@ const YieldsTransactionPage: React.FC = () => {
       )}
     </View>
   );
+  
 
   const renderYourYields = () => (
     <View style={styles.tabContainer}>
@@ -229,12 +264,15 @@ const YieldsTransactionPage: React.FC = () => {
                 <Image source={{ uri: item.proof_url }} style={styles.itemImage} />
               )}
               <View style={styles.itemInfo}>
-                <Text style={styles.itemName}>Claim #{item.yield_id}</Text>
-                <Text
-                  style={[styles.itemCategory, { color: getStatusColor(item.status) }]}
+                <Text style={styles.itemName}>Item #{item.item_id}</Text>
+                <View
+                  style={[
+                    styles.statusTag,
+                    { backgroundColor: getStatusColor(item.status) },
+                  ]}
                 >
-                  Status: {item.status}
-                </Text>
+                  <Text style={styles.statusText}>{item.status}</Text>
+                </View>
                 <Text style={styles.itemDescription}>{item.description}</Text>
               </View>
             </TouchableOpacity>
@@ -244,13 +282,13 @@ const YieldsTransactionPage: React.FC = () => {
     </View>
   );
 
-const handleItemPress = (item: any) => {
-  // here you can add a direct transition to another page
-  //navigation.navigate(); '' <- desired page
-};
+  const handleItemPress = (item: any) => {
+    // here you can add a direct transition to another page
+    //navigation.navigate(); '' <- desired page
+  };
 
-const handleYieldPress = (item: any) => {
-};
+  const handleYieldPress = (item: any) => {
+  };
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -261,7 +299,7 @@ const handleYieldPress = (item: any) => {
       case "pending":
         return "#FFA500"; // yellow
       default:
-        return "#888"; // gray (this is for text only (currently))
+        return "#888"; // gray
     }
   };
 
@@ -337,16 +375,8 @@ const handleYieldPress = (item: any) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingTop: 50, backgroundColor: "#fff" },
-  backButton: {
-    position: "absolute",
-    top: 50,
-    left: 20,
-    zIndex: 10,
-    backgroundColor: "#f5f5f5",
-    padding: 8,
-    borderRadius: 20,
-  },
+  container: { flex: 1, padding: 20, backgroundColor: "#fff" },
+  backButton: { marginBottom: 20 },
   title: {
     textAlign: "center",
     fontSize: 20,
@@ -362,13 +392,13 @@ const styles = StyleSheet.create({
   boldText: {
     fontSize: 16,
     fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: 5,
+    textAlign: "center", 
+    marginBottom: 5,  
   },
   descriptionText: {
     fontSize: 14,
     color: "#555",
-    textAlign: "center",
+    textAlign: "center",  
   },
   tabContainer: {
     flex: 1,
@@ -382,14 +412,14 @@ const styles = StyleSheet.create({
   },
   blankText: {
     fontSize: 16,
-    color: "#777",
+    color: "#888",
   },
   cardListContainer: {
     paddingTop: 10,
   },
   itemCard: {
     flexDirection: "row",
-    backgroundColor: "#f8f8f8",
+    backgroundColor: "#f0f0f0",
     borderRadius: 8,
     marginBottom: 10,
     padding: 10,
@@ -402,10 +432,12 @@ const styles = StyleSheet.create({
   },
   itemInfo: {
     flex: 1,
+    flexDirection: 'column'
   },
   itemName: {
     fontSize: 16,
     fontWeight: "bold",
+    marginBottom: 8,
   },
   itemCategory: {
     fontSize: 14,
@@ -415,6 +447,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#555",
   },
+  statusTag: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  statusText: { color: "#fff", fontWeight: "bold", fontSize: 12, textTransform: "uppercase" },
 });
 
 export default YieldsTransactionPage;

@@ -27,6 +27,7 @@ const ChatScreen = () => {
   const [inputText, setInputText] = useState("");
   const [userId, setUserId] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [rejectModalVisible, setRejectModalVisible] = useState(false);
   const [claimStatus, setClaimStatus] = useState<string | null>(null);
   const flatListRef = useRef<FlatList<any>>(null);
   const isChatDisabled = claimStatus === "approved" || claimStatus === "completed";
@@ -144,83 +145,58 @@ const ChatScreen = () => {
 
   const handleApprove = async () => {
     if (!claim_id || !userId) return;
-  
+
     try {
-      // 1. Update claim to approved
       let { error: claimError } = await supabase
         .from("claims")
         .update({ status: "approved" })
         .eq("claim_id", claim_id);
-  
+
       if (claimError) throw claimError;
-  
-      // 2. Get item_id and user_id of claimer
+
       let { data: claimData, error: claimFetchError } = await supabase
         .from("claims")
-        .select("item_id, user_id")
+        .select("item_id")
         .eq("claim_id", claim_id)
         .single();
-  
+
       if (claimFetchError || !claimData) throw claimFetchError;
-  
+
       const itemId = claimData.item_id;
-      const receiverId = claimData.user_id; // the person claiming the item
-  
-      // 3. Update item status
+
       let { error: itemError } = await supabase
         .from("found_items")
         .update({ status: "return_pending" })
         .eq("item_id", itemId);
-  
+
       if (itemError) throw itemError;
-  
-      // 4. Get sender's name from guest_users or institutional_users
-      let senderName = "Someone";
-  
-      const { data: guestData, error: guestError } = await supabase
-        .from("guest_users")
-        .select("name")
-        .eq("id", userId)
-        .single();
-  
-      if (guestData?.name) {
-        senderName = guestData.name;
-      } else {
-        const { data: institutionalData, error: institutionalError } = await supabase
-          .from("institutional_users")
-          .select("name")
-          .eq("id", userId)
-          .single();
-  
-        if (institutionalData?.name) {
-          senderName = institutionalData.name;
-        }
-      }
-  
-      // 5. Insert notification
-      const { error: notificationError } = await supabase
-        .from("notifications")
-        .insert([
-          {
-            receiver_id: receiverId,
-            sender_id: userId,
-            item_id: itemId,
-            message: `${senderName} has approved the claim for the item "${item_name}".`,
-            read: false,
-          },
-        ]);
-  
-      if (notificationError) throw notificationError;
-  
+
       alert("Claim approved! Proceed with returning the item.");
       setClaimStatus("approved");
-      setModalVisible(false); // close modal after approval
     } catch (error: any) {
-      console.error("Error approving claim or inserting notification:", error.message);
+      console.error("Error approving claim:", error.message);
       alert("Failed to approve claim. Try again.");
     }
   };
+
+  const handleReject = async () => {
+    if (!claim_id || !userId) return;
   
+    try {
+      let { error: claimError } = await supabase
+        .from("claims")
+        .update({ status: "rejected" })
+        .eq("claim_id", claim_id);
+  
+      if (claimError) throw claimError;
+  
+      alert("Claim rejected.");
+      setClaimStatus("rejected");
+    } catch (error: any) {
+      console.error("Error rejecting claim:", error.message);
+      alert("Failed to reject claim. Try again.");
+    }
+  };  
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -259,16 +235,23 @@ const ChatScreen = () => {
         <>
           <View style={styles.approvalWarningBox}>
             <Text style={styles.approvalWarningText}>
-              Approving the claimer's request will proceed you to the returning process. This will disregard other claims on this item.{" "}
+            Selecting <Text style={{ fontWeight: "bold" }}>Approve</Text> will proceed with the returning process, disregarding other claims on this item. 
+            Selecting <Text style={{ fontWeight: "bold" }}>Reject</Text> will maintain the item's current status and allow other claims to remain active.{" "}
               <Text style={{ fontWeight: "bold" }}>
                 Proceed with caution — this action cannot be undone.
               </Text>
             </Text>
           </View>
 
-          <TouchableOpacity style={styles.approveButton} onPress={() => setModalVisible(true)}>
-            <Text style={{ color: "#fff", fontWeight: "bold" }}>Approve Claim</Text>
-          </TouchableOpacity>
+          <View style={styles.actionButtonsContainer}>
+            <TouchableOpacity style={[styles.actionButton, styles.rejectButton]} onPress={() => setRejectModalVisible(true)}>
+              <Text style={styles.actionButtonText}>Reject</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={[styles.actionButton, styles.approveButton]} onPress={() => setModalVisible(true)}>
+              <Text style={styles.actionButtonText}>Approve</Text>
+            </TouchableOpacity>
+          </View>
         </>
       )}
 
@@ -310,6 +293,28 @@ const ChatScreen = () => {
 
               <TouchableOpacity style={[styles.modalButton, styles.approveModalButton]} onPress={handleApprove}>
                 <Text style={{ color: "#fff" }}>Approve</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal animationType="slide" transparent={true} visible={rejectModalVisible} onRequestClose={() => setRejectModalVisible(false)}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Confirm Rejection</Text>
+            <Text style={styles.modalText}>
+              Are you sure you want to reject this claim? This action cannot be undone.
+            </Text>
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={() => setRejectModalVisible(false)}>
+                <Text style={{ color: "#fff" }}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={[styles.modalButton, styles.rejectButton]} 
+                onPress={() => {setRejectModalVisible(false); handleReject(); }}>
+                <Text style={{ color: "#fff" }}>Reject</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -370,12 +375,13 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     justifyContent: "center",
   },
+  rejectButton: {
+    backgroundColor: "red",
+    marginRight: 5, // only applies if you don't use `gap`
+  },
   approveButton: {
     backgroundColor: "green",
-    padding: 10,
-    margin: 10,
-    borderRadius: 5,
-    alignItems: "center",
+    marginLeft: 5, // only applies if you don't use `gap`
   },
   claimNote: {
     textAlign: "center",
@@ -418,7 +424,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   cancelButton: {
-    backgroundColor: "#FF3B30",
+    backgroundColor: "#A3A3A3",
   },
   approveModalButton: {
     backgroundColor: "#34C759",
@@ -436,6 +442,24 @@ const styles = StyleSheet.create({
     color: "#7A4E00",
     fontSize: 14,
     lineHeight: 18,
+  },
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginHorizontal: 10,
+    marginTop: 10,
+    gap: 10, // if gap doesn’t work on your RN version, use marginRight on the first button
+  },
+  actionButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  actionButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 16,
   },
 });
 

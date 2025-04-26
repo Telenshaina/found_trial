@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Platform, Image } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Platform, Image, ActivityIndicator } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import RNPickerSelect from 'react-native-picker-select';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -23,6 +23,8 @@ const LostItemUploadScreen = () => {
   const [showPicker, setShowPicker] = useState(false);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   
   // Tag management: Add tags using enter only
   const handleTagInput = (text: string) => {
@@ -86,10 +88,17 @@ const LostItemUploadScreen = () => {
 
   // Upload data to Supabase
   const uploadToSupabase = async () => {
+    if (isUploading) {
+      console.log('Your lost item has already been posted.');
+      return;
+    }
+
     if (!itemName || !category || !lastSeenAt || !description || !image) {
       alert('Please fill all fields and select an image.');
       return;
     }
+
+    setIsUploading(true); // Set upload in progress
   
     try {
       // Get authenticated user
@@ -102,10 +111,8 @@ const LostItemUploadScreen = () => {
       const userId = user.user.id; // Extract user ID
       const userEmail = user.user.email || ''; // Extract user email
       // Determine user type based on email
-      let userType = 'Guest'; // Default to 'Guest'
-      if (userEmail.endsWith('neu.edu.ph')) {
-        userType = 'Institutional';
-      }
+      const userType = userEmail.endsWith('neu.edu.ph') ? 'Institutional' : 'Guest';
+
       const fileName = `images/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.jpg`;
       const response = await fetch(image);
       const blob = await response.blob();
@@ -121,10 +128,31 @@ const LostItemUploadScreen = () => {
       }
   
       const imageUrl = supabase.storage.from('uploads').getPublicUrl(fileName).data.publicUrl;
-  
       console.log('Uploaded Image URL:', imageUrl); // Debugging
   
-      // Insert lost item with authenticated user ID
+      // Step 1: Check for duplicates
+      const { data: existingItems, error: fetchError } = await supabase
+        .from('lost_items')
+        .select('*')
+        .eq('posted_by', userId)
+        .eq('item_name', itemName)
+        .eq('category', category)
+        .eq('last_seen_at', lastSeenAt);
+      
+      if (fetchError) {
+        console.error('Error checking for duplicates:', fetchError);
+        alert('Something went wrong. Please try again later.');
+        setIsUploading(false);
+        return;
+      }
+
+      if (existingItems && existingItems.length > 0) {
+        alert('You have already posted this item.');
+        setIsUploading(false);
+        return;
+      }
+
+      // Step 2: Insert lost item
       const { error: dbError } = await supabase.from('lost_items').insert([
         {
           item_name: itemName,
@@ -165,6 +193,8 @@ const LostItemUploadScreen = () => {
     } catch (err) {
       console.error('Unexpected error:', err);
       alert('Something went wrong. Please try again.');
+    } finally {
+      setIsUploading(false);
     }
   };
   
@@ -269,9 +299,43 @@ const LostItemUploadScreen = () => {
 
           {image && <Image source={{ uri: image }} style={{ width: 100, height: 100, alignSelf: 'center' }} />}
 
-          <TouchableOpacity style={[styles.button, styles.primaryButton]} onPress={uploadToSupabase}>
-            <Text style={styles.primaryButtonText}>Post Item</Text>
-          </TouchableOpacity>
+        <TouchableOpacity style={[styles.button, styles.primaryButton]}
+        onPress={() => setShowConfirmModal(true)} disabled={isUploading}>
+          <Text style={styles.primaryButtonText}>Post Item</Text>
+        </TouchableOpacity>
+
+        {isUploading && (
+          <View style={styles.loadingOverlay}>
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#fff" />
+              <Text style={styles.loadingText}>Uploading item...</Text>
+            </View>
+          </View>
+        )}
+
+        {showConfirmModal && (
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContainer}>
+              <Text style={styles.modalTitle}>Confirm Upload</Text>
+              <Text style={styles.modalText}>Are you sure you want to post this lost item?</Text>
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity style={[styles.button, styles.cancelButton]}
+                  onPress={() => setShowConfirmModal(false)}>
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={[styles.button, styles.confirmButton]}
+                  onPress={() => {
+                    setShowConfirmModal(false);
+                    uploadToSupabase();
+                  }}>
+                  <Text style={styles.confirmButtonText}>Confirm</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
 
         </View>
       </ScrollView>
@@ -421,6 +485,83 @@ const styles = StyleSheet.create({
     fontSize: 16,
     padding: 8,
     minWidth: 100,
+  },
+  modalOverlay: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999, // make sure it's above everything
+  },
+  modalContainer: {
+    width: '80%',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 20,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  modalText: {
+    fontSize: 16,
+    color: '#555',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  cancelButton: {
+    backgroundColor: '#ccc',
+    padding: 10,
+    borderRadius: 8,
+    flex: 1,
+    marginRight: 5,
+    alignItems: 'center',
+  },
+  confirmButton: {
+    backgroundColor: '#007BFF',
+    padding: 10,
+    borderRadius: 8,
+    flex: 1,
+    marginLeft: 5,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  confirmButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  }, 
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  loadingContainer: {
+    backgroundColor: '#333',
+    padding: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#fff',
+    marginTop: 10,
+    fontSize: 16,
   },
 });
 

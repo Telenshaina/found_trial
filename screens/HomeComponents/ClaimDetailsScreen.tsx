@@ -18,7 +18,6 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
   const { claim, incoming } = route.params;
   const navigation = useNavigation<ClaimDetailsScreenNavigationProp>();
   const [userId, setUserId] = useState<string | null>(null);
-  const [modalVisible, setModalVisible] = useState(false);
   const [actionType, setActionType] = useState<'finder' | 'claimer' | null>(null);
   const [hasChatted, setHasChatted] = useState(false);
   const [claimStatus, setClaimStatus] = useState<string | null>(null);
@@ -36,7 +35,7 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
     fetchUser();
   }, []);
   
-  // To get the claim stats
+  // To get the claim status
   useEffect(() => {
     const fetchClaimStatus = async () => {
       const { data, error } = await supabase
@@ -53,6 +52,50 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
     };
     fetchClaimStatus();
   }, [claim.claim_id]); 
+
+  const handleApproveClaim = async () => {
+    if (!hasChatted) {
+      Alert.alert('Chat Required', 'You need to chat before taking action.');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('claims')
+        .update({ status: 'approved' })
+        .eq('claim_id', claim.claim_id);
+
+      if (error) throw error;
+
+      Alert.alert('Success', 'Claim has been approved');
+      navigation.goBack();
+    } catch (error) {
+      console.error('Error approving claim:', error);
+      Alert.alert('Error', 'Failed to approve claim.');
+    }
+  };
+
+  const handleRejectClaim = async () => {
+    if (!hasChatted) {
+      Alert.alert('Chat Required', 'You need to chat before taking action.');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('claims')
+        .update({ status: 'rejected' })
+        .eq('claim_id', claim.claim_id);
+      
+      if (error) throw error;
+
+      Alert.alert('Success', 'Claim has been rejected.');
+      navigation.goBack();
+    } catch (error) {
+      console.error('Error rejecting claim:', error);
+      Alert.alert('Error', 'Failed to reject claim.');
+    }
+  };
   
   const handleDeleteClaim = async () => {
     Alert.alert('Delete Claim', 'Are you sure you want to delete this claim?', [
@@ -306,10 +349,18 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
           <TouchableOpacity
             style={[styles.actionButton, { backgroundColor: '#28a745' }]}
-            onPress={confirmReceived}
-            disabled={claimStatus === 'pending' || claimStatus === 'rejected'}
+            onPress={handleApproveClaim}
+            disabled={claimStatus === 'approved' || claimStatus === 'rejected'}
           >
-            <Text style={styles.actionButtonText}>Confirm Item Received</Text>
+            <Text style={styles.actionButtonText}>Approve</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: '#ffc107' }]}
+            onPress={handleRejectClaim}
+            disabled={claimStatus === 'approved' || claimStatus === 'rejected'}
+          >
+            <Text style={styles.actionButtonText}>Reject</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -317,7 +368,7 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
             onPress={handleDeleteClaim}
             disabled={claimStatus === 'claimed'}
           >
-            <Text style={styles.actionButtonText}>Delete Claim</Text>
+            <Text style={styles.actionButtonText}>Delete</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -338,6 +389,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     marginVertical: 10,
+    textAlign: 'center',
   },
   detailCard: {
     backgroundColor: '#fff',

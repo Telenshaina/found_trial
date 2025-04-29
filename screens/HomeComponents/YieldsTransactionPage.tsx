@@ -209,7 +209,7 @@ const YieldsTransactionPage: React.FC = () => {
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.itemCard}
-              onPress={() => handleYieldPress(item)}
+              onPress={() => handleItemPress(item, true)} 
               activeOpacity={0.8}
             >
               {item.proof_url && (
@@ -258,7 +258,7 @@ const YieldsTransactionPage: React.FC = () => {
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.itemCard}
-              onPress={() => handleYieldPress(item)}
+              onPress={() => handleItemPress(item, true)} 
             >
               {item.proof_url && (
                 <Image source={{ uri: item.proof_url }} style={styles.itemImage} />
@@ -282,14 +282,15 @@ const YieldsTransactionPage: React.FC = () => {
     </View>
   );
 
-  const handleItemPress = (item: any) => {
-    // here you can add a direct transition to another page
-    //navigation.navigate(); '' <- desired page
+  const handleItemPress = (item: any, incoming: boolean) => {
+    // Navigate to the YieldDetailsScreen and pass the yieldData and incoming flag
+    navigation.navigate('YieldDetailsScreen', {
+      yieldData: item,
+      incoming: incoming,
+    });
   };
-
-  const handleYieldPress = (item: any) => {
-  };
-
+  
+ 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case "approved":

@@ -66,7 +66,6 @@ const InstitutionalLogin: React.FC = () => {
         const { id: userId, email, user_metadata } = session.user;
         const name = user_metadata?.full_name || "Institutional User";
 
-        // Fetch institutional user info
         const { data: user, error } = await supabase
           .from("institutional_users")
           .select("*")
@@ -78,12 +77,8 @@ const InstitutionalLogin: React.FC = () => {
           return;
         }
 
-        // Check if banned
         if (user?.status === "banned") {
-          Alert.alert(
-            "You are banned",
-            "If you think this is a mistake, please contact an admin."
-          );
+          Alert.alert("You are banned", "If you think this is a mistake, please contact an admin.");
           await supabase.auth.signOut();
           return;
         }
@@ -91,15 +86,12 @@ const InstitutionalLogin: React.FC = () => {
         // Log login activity
         await logUserActivity(userId, name, email, "login", "Institutional");
 
-        // Check for missing details
         if (!user.phone_number || !user.student_number) {
           setShowModal(true); // Show modal if info is incomplete
         } else {
-          navigation.replace("Main"); // Navigate if info is complete
+          navigation.replace("Main"); // Navigate to Main if info is complete
         }
-
       } else if (session) {
-        // Non-institutional user tried to log in
         Alert.alert("Unauthorized", "Only institutional accounts can log in here. Try the Guest tab.");
         supabase.auth.signOut();
       }
@@ -113,9 +105,7 @@ const InstitutionalLogin: React.FC = () => {
   const handleGoogleSignIn = async () => {
     setLoading(true);
     try {
-      const redirectUri = AuthSession.makeRedirectUri();
-
-      
+      const redirectUri = AuthSession.makeRedirectUri() + "?useProxy=true"; // Make sure you append `?useProxy=true` if you are using expo.
   
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -125,18 +115,31 @@ const InstitutionalLogin: React.FC = () => {
       if (error) throw error;
   
       if (data?.url) {
-        // Open the OAuth session in the browser
-        const result = await WebBrowser.openAuthSessionAsync(
-          data.url,
-          redirectUri,
-        );
+        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
         
-  
         if (result.type === "success") {
-          // If the result is successful, the session should be established automatically
-          console.log("Authentication successful");
-          // Handle the redirection here (replace with the main page)
-          navigation.replace("Main");
+          console.log("Processing redirect URL:", result.url);
+          const urlObj = new URL(result.url);
+          
+          // Extract the access token from the URL hash
+          let accessToken = new URLSearchParams(urlObj.hash.replace("#", "?")).get("access_token");
+          let refreshToken = new URLSearchParams(urlObj.hash.replace("#", "?")).get("refresh_token");
+  
+          if (accessToken && refreshToken) {
+            // Set session with both access token and refresh token
+            await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+  
+            console.log("Session set successfully");
+  
+            // Navigate to the Main screen after successful login
+            navigation.replace("Main");
+          } else {
+            console.error("Access token or refresh token not found in redirect URL.");
+            Alert.alert("Login Error", "Could not authenticate.");
+          }
         }
       }
     } catch (error) {
@@ -147,21 +150,9 @@ const InstitutionalLogin: React.FC = () => {
     }
   };
   
-  
-
-
   return (
     <View style={styles.loginContainer}>
-      <Text style={styles.description}>
-        Welcome to New Era University’s very
-      </Text>
-      <Text style={styles.description}>
-        own <Text style={{ color: "green" }}>lost & found</Text> app!
-      </Text>
-
-      <Text style={styles.subText}>
-        FoundNEU is NEU’s official platform for reporting, tracking, and recovering lost items within our community. Whether you’ve lost or found something, our system helps reconnect belongings with their rightful owners efficiently.
-      </Text>
+      <Text style={styles.description}>Welcome to New Era University’s very</Text>
       <TouchableOpacity style={styles.signInButton} onPress={handleGoogleSignIn}>
         <Text style={styles.signInText}>Enter as Institutional User</Text>
       </TouchableOpacity>
@@ -179,26 +170,26 @@ const GuestLogin: React.FC = () => {
         const userId = session.user.id;
         const email = session.user.email;
         const name = session.user.user_metadata?.full_name || "Guest User";
-  
+
         if (!email) {
           console.error("Email is undefined! Check the session object.");
           return;
         }
-  
+
         const userType = email.endsWith("@gmail.com") ? "Guest" : "Institutional";
-  
+
         // Check if user is banned in guest_users
         const { data: user, error } = await supabase
           .from("guest_users")
           .select("status")
           .eq("id", userId)
           .single();
-  
+
         if (error) {
           console.error("Error fetching user status:", error.message);
           return;
         }
-  
+
         if (user?.status === "banned") {
           Alert.alert(
             "You are banned",
@@ -207,30 +198,57 @@ const GuestLogin: React.FC = () => {
           await supabase.auth.signOut();
           return;
         }
-  
+
         await logUserActivity(userId, name, email, "login", userType);
         navigation.replace("Setup");
       }
     });
-  
+
     return () => {
       authListener.subscription.unsubscribe();
     };
   }, []);
-  
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
     try {
-      const redirectUri = AuthSession.makeRedirectUri({
-        scheme: "foundneu", // must match your app.json
-      });
+      const redirectUri = AuthSession.makeRedirectUri() + "?useProxy=true"; // Make sure you append `?useProxy=true` if you are using expo.
+  
       const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
+        provider: 'google',
         options: { redirectTo: redirectUri },
       });
-
+  
       if (error) throw error;
+  
+      if (data?.url) {
+        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
+        
+        if (result.type === "success") {
+          console.log("Processing redirect URL:", result.url);
+          const urlObj = new URL(result.url);
+          
+          // Extract the access token from the URL hash
+          let accessToken = new URLSearchParams(urlObj.hash.replace("#", "?")).get("access_token");
+          let refreshToken = new URLSearchParams(urlObj.hash.replace("#", "?")).get("refresh_token");
+  
+          if (accessToken && refreshToken) {
+            // Set session with both access token and refresh token
+            await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+  
+            console.log("Session set successfully");
+  
+            // Navigate to the Main screen after successful login
+            navigation.replace("Main");
+          } else {
+            console.error("Access token or refresh token not found in redirect URL.");
+            Alert.alert("Login Error", "Could not authenticate.");
+          }
+        }
+      }
     } catch (error) {
       console.error("Login Error:", error);
       Alert.alert("Login Failed", "Something went wrong. Please try again.");

@@ -14,6 +14,7 @@ import TransactionPage from "./screens/HomeComponents/TransactionPage";
 import TransactionScreen from "./screens/HomeComponents/TransactionScreen";
 import YieldsTransactionPage from "./screens/HomeComponents/YieldsTransactionPage";
 import ClaimedItems from "./screens/HomeComponents/ClaimedItems";
+import YieldDetailsScreen from "./screens/HomeComponents/YieldDetailsScreen";
 import ClaimDetailsScreen from "./screens/HomeComponents/ClaimDetailsScreen";
 import ChatScreen from "./screens/HomeComponents/ChatScreen";
 import AuthChecker from "./screens/AuthChecker"; 
@@ -41,6 +42,7 @@ export type RootStackParamList = {
   YieldsTransactionPage: undefined;
   ClaimedItems: undefined;
   ClaimDetailsScreen: { claim: any; incoming: boolean };
+  YieldDetailsScreen: { yieldData: any; incoming: boolean };
   ListOfFoundItems: undefined;
   ListOfLostItems: undefined;
   ListOfCategorizedItems: { title: string }; 
@@ -77,6 +79,7 @@ const App = () => {
         <Stack.Screen name="TransactionScreen" component={TransactionScreen} />
         <Stack.Screen name="YieldsTransactionPage" component={YieldsTransactionPage} />
         <Stack.Screen name="ClaimedItems" component={ClaimedItems} />
+        <Stack.Screen name="YieldDetailsScreen" component={YieldDetailsScreen} />
         <Stack.Screen name="ClaimDetailsScreen" component={ClaimDetailsScreen} />
         <Stack.Screen
           name="ChatScreen"

@@ -77,6 +77,34 @@ const LostItemDetailsScreen = ({ route }: { route: any }) => {
   
     fetchUser();
   }, [item.posted_by]);
+
+   // Fetch user details and update state
+      useEffect(() => {
+        const fetchUserDetails = async () => {
+          if (!authUserId) return;
+  
+          const { data, error } = await supabase
+            .from('institutional_users')
+            .select('name, email, phone_number')
+            .eq('id', authUserId)
+            .single();
+  
+          if (data) {
+            setProofData((prevData) => ({
+              ...prevData,
+              name: data.name,
+              email: data.email,
+              phone: data.phone_number,
+            }));
+          }
+  
+          if (error) {
+            console.error('Error fetching user details:', error);
+          }
+        };
+  
+        fetchUserDetails();
+      }, [authUserId]);
   
   const handleButtonPress = () => {
     if (isOwner) {
@@ -156,16 +184,17 @@ const LostItemDetailsScreen = ({ route }: { route: any }) => {
   
     // Insert proof details into Supabase
     const { error } = await supabase
-      .from('yields')
-      .insert([
-        {
-          user_id: authUserId,
-          item_id: item.item_id,
-          proof_url: proofUrl,
-          description: proofData.identifyingInfo,
-          status: 'pending',
-        },
-      ]);
+    .from('yields')
+    .insert([
+      {
+        user_id: authUserId,
+        item_id: item.item_id,
+        proof_url: proofUrl,
+        description: proofData.identifyingInfo,
+        status: 'pending',
+        lost_by: item.posted_by,  // Set lost_by to posted_by value
+      },
+    ]);
   
     setIsSubmitting(false);
   
@@ -250,9 +279,9 @@ const LostItemDetailsScreen = ({ route }: { route: any }) => {
       <Modal visible={isProofModalVisible} animationType="slide" transparent>
             <View style={styles.modalOverlay}>
               <View style={styles.modalContainer}>
-                <Text style={styles.modalTitle}>Submit Proof of Ownership</Text>
+                <Text style={styles.modalTitle}>Submit Proof that you found this item</Text>
                 <Text style={styles.modalDescription}>
-                  Please provide details to prove this item belongs to you. The owner will review your claim.
+                  Please provide details to prove this you found this item . The owner will review your yield.
                 </Text>
       
                 {/* Full Name Input */}
@@ -297,7 +326,7 @@ const LostItemDetailsScreen = ({ route }: { route: any }) => {
                 {/* Pickup Location (Optional) */}
                 <TextInput
                   style={styles.input}
-                  placeholder="Preferred pickup location (optional)"
+                  placeholder="Preferred pickup location "
                   value={proofData.pickupLocation}
                   onChangeText={(text) => setProofData({ ...proofData, pickupLocation: text })}
                 />

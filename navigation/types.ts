@@ -20,8 +20,9 @@ export type RootStackParamList = {
   };
 
   TransactionScreen: {claim: any}
+  TransactionScreenYield: {yieldData: any}
   ClaimedItems: undefined;
-  ClaimDetailsScreen: { claim: any; incoming: boolean };
+  ClaimDetailsScreen: { claim: any; incoming: boolean;};
   ListOfCategorizedItems: { title: string };
 
   // Updated ChatScreen to include user_id

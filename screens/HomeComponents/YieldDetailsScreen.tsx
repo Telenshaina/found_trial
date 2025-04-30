@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, Alert, Modal } from 'react-native';
 import Icon from 'react-native-vector-icons/Foundation';
 import Icon2 from 'react-native-vector-icons/Ionicons';
 import { RouteProp, useNavigation } from '@react-navigation/native';
@@ -21,9 +21,15 @@ const YieldDetailsScreen: React.FC<Props> = ({ route }) => {
   const [actionType, setActionType] = useState<'finder' | 'claimer' | null>(null);
   const [hasChatted, setHasChatted] = useState(false);
   const [yieldStatus, setYieldStatus] = useState<string | null>(null);
+  const [showChatRequiredModal, setShowChatRequiredModal] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [modalActionType, setModalActionType] = useState<'approve' | 'reject' | null>(null);
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [showDeleteResultModal, setShowDeleteResultModal] = useState<{ success: boolean; message: string } | null>(null);
 
-  const isFinder = userId === yieldData.found_by;
-  const isClaimer = userId === yieldData.user_id;
+  const isOwner = userId === yieldData.lost_by;
+  const isYielder = userId === yieldData.user_id;
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -151,6 +157,76 @@ const YieldDetailsScreen: React.FC<Props> = ({ route }) => {
     }
   };
 
+  const handleApproveClaim = () => {
+    if (!hasChatted) {
+      setShowChatRequiredModal(true);
+      return;
+    }
+    setModalActionType('approve');
+    setShowConfirmModal(true);
+  };
+  
+  const handleRejectClaim = () => {
+    if (!hasChatted) {
+      setShowChatRequiredModal(true);
+      return;
+    }
+    setModalActionType('reject');
+    setShowConfirmModal(true);
+  };  
+  
+  const handleDeleteClaim = () => {
+    setShowDeleteConfirmModal(true);
+  };  
+
+  const performAction = async () => {
+    if (!modalActionType) return;
+  
+    try {
+      const { error } = await supabase
+        .from('yields')
+        .update({ status: modalActionType === 'approve' ? 'approved' : 'rejected' })
+        .eq('yield_id', yieldData.yield_id);
+  
+      if (error) throw error;
+  
+      setShowConfirmModal(false);
+      setShowSuccessModal(true);
+    } catch (error) {
+      console.error(`Error ${modalActionType} claim:`, error);
+      Alert.alert('Error', `Failed to ${modalActionType} claim.`);
+      setShowConfirmModal(false);
+    }
+  };
+
+  const confirmDeleteClaim = async () => {
+    try {
+      const { error } = await supabase
+        .from('claims')
+        .delete()
+        .eq('yield_id', yieldData.yield_id);
+  
+      if (error) {
+        setShowDeleteResultModal({ success: false, message: 'Failed to delete item.' });
+      } else {
+        setShowDeleteResultModal({ success: true, message: 'Claim has been deleted.' });
+      }
+    } catch (error) {
+      console.error('Error deleting claim:', error);
+      setShowDeleteResultModal({ success: false, message: 'Failed to delete item.' });
+    } finally {
+      setShowDeleteConfirmModal(false); // hide confirmation modal
+    }
+  };
+
+  const handleCloseDeleteResultModal = () => {
+    if (showDeleteResultModal?.success) {
+      navigation.goBack(); // only navigate if deletion was successful
+    }
+    setShowDeleteResultModal(null);
+  };  
+
+
   const checkFinalization = async () => {
     const { data, error } = await supabase
       .from('yields')
@@ -272,121 +348,240 @@ const YieldDetailsScreen: React.FC<Props> = ({ route }) => {
               {(yieldData.status.toLowerCase() === 'pending' || yieldData.status.toLowerCase() === 'approved' || yieldData.status.toLowerCase() === 'claimed') && (
                 <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#007AFF'}]} onPress={handleChatPress}>
                   <Text style={styles.actionButtonText}>
-                    <Icon2 name='chatbubbles' size={18} color='#fff' />  {isFinder ? 'Chat with Claimer' : 'Chat with Uploader'}
+                    <Icon2 name='chatbubbles' size={18} color='#fff' />  {isYielder ? 'Chat with Uploader' : 'Chat with Yielder'}
                   </Text>
                 </TouchableOpacity>
               )}
 
-        {yieldStatus && ['approved', 'claimed'].includes(yieldStatus) && (
-                  <TouchableOpacity
-                    onPress={() => navigation.navigate('TransactionScreen', { yieldData })}
-                    disabled={yieldStatus === 'pending' || yieldStatus === 'rejected'}
-                    style={[styles.actionButton, { backgroundColor: '#ff9500' }]}
-                  >
-                    <Text style={styles.actionButtonText}>
-                      <Icon2 name="search" size={18} color="#fff" /> View Transaction Process
-                    </Text>
-                  </TouchableOpacity>
-                )}
-
-        {(isFinder && yieldStatus === 'pending') && (
-          <TouchableOpacity onPress={handleApproveYield} style={styles.button}>
-            <Text style={styles.buttonText}>Approve Yield</Text>
-          </TouchableOpacity>
-        )}
-
-        {(isClaimer && yieldStatus === 'approved') && (
-          <TouchableOpacity onPress={handleConfirmReceived} style={styles.button}>
-            <Text style={styles.buttonText}>Confirm Item Received</Text>
-          </TouchableOpacity>
-        )}
-
-        {(isFinder && yieldStatus === 'approved') && (
-          <TouchableOpacity onPress={handleConfirmReturn} style={styles.button}>
-            <Text style={styles.buttonText}>Confirm Item Return</Text>
-          </TouchableOpacity>
-        )}
-
-        {(isFinder || isClaimer) && (
-          <TouchableOpacity onPress={handleRejectYield} style={styles.button}>
-            <Text style={styles.buttonText}>Reject Yield</Text>
-          </TouchableOpacity>
-        )}
-
-        {(isFinder || isClaimer) && (
-          <TouchableOpacity onPress={handleDeleteYield} style={[styles.button, { backgroundColor: 'red' }]}>
-            <Text style={styles.buttonText}>Delete Yield</Text>
+{yieldStatus && ['approved', 'claimed'].includes(yieldStatus) && (
+          <TouchableOpacity
+            onPress={() => navigation.navigate('TransactionScreenYield', { yieldData})}
+            disabled={yieldStatus === 'pending' || yieldStatus === 'rejected'}
+            style={[styles.actionButton, { backgroundColor: '#ff9500' }]}
+          >
+            <Text style={styles.actionButtonText}>
+              <Icon2 name="search" size={18} color="#fff" /> View Transaction Process
+            </Text>
           </TouchableOpacity>
         )}
       </View>
+
+      {incoming && (yieldData.status.toLowerCase() === 'pending'|| yieldData.status.toLowerCase() === 'claimed') && (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: '#28a745' }]}
+            onPress={handleApproveClaim}
+            disabled={yieldStatus === 'approved' || yieldStatus === 'rejected'}
+          >
+            <Text style={styles.actionButtonText}>Approve</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: '#ffc107' }]}
+            onPress={handleRejectClaim}
+            disabled={yieldStatus === 'approved' || yieldStatus === 'rejected'}
+          >
+            <Text style={styles.actionButtonText}>Reject</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: '#dc3545' }]}
+            onPress={handleDeleteClaim}
+            disabled={yieldStatus === 'claimed'}
+          >
+            <Text style={styles.actionButtonText}>Delete</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {yieldStatus === 'rejected' && (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 10 }}>
+          <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#dc3545' }]} onPress={handleDeleteClaim}>
+            <Text style={styles.actionButtonText}>Delete</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Modal for Chat Required */}
+      <Modal visible={showChatRequiredModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Chat Required</Text>
+            <Text style={styles.modalText}>You must chat with the other user before taking action.</Text>
+            <TouchableOpacity onPress={() => setShowChatRequiredModal(false)} style={[styles.modalButton, { backgroundColor: '#0d6efd' }]}>
+              <Text style={styles.modalButtonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal for Confirm Approve/Reject */}
+      <Modal visible={showConfirmModal} transparent animationType="fade">
+        <View style={styles.modalBackground}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>{modalActionType === 'approve' ? 'Confirm Approval' : 'Confirm Rejection'}</Text>
+            <Text style={styles.modalText}>
+              Are you sure you want to {modalActionType === 'approve' ? 'approve' : 'reject'} this claim?
+            </Text>
+
+            {/* FIXED button layout */}
+            <View style={styles.modalButtonContainer}>
+              <TouchableOpacity style={[styles.modalButton, { backgroundColor: '#dc3545' }]} onPress={() => setShowConfirmModal(false)}>
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={[styles.modalButton, { backgroundColor: '#28a745' }]} onPress={performAction}>
+                <Text style={styles.modalButtonText}>Confirm</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal for Success */}
+      <Modal visible={showSuccessModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Success</Text>
+            <Text style={styles.modalText}>Claim has been {modalActionType}ed successfully.</Text>
+            <TouchableOpacity onPress={() => { 
+              setShowSuccessModal(false); 
+              navigation.goBack();
+              }} style={styles.modalButton}>
+              <Text style={[styles.modalButtonText, { backgroundColor: '#0d6efd' }]}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal visible={showDeleteConfirmModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Delete Claim</Text>
+            <Text style={styles.modalText}>Are you sure you want to delete this claim?</Text>
+            <View style={styles.modalButtonContainer}>
+              <TouchableOpacity style={[styles.modalButton, { backgroundColor: '#a3a3a3' }]} onPress={() => setShowDeleteConfirmModal(false)}>
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={[styles.modalButton, { backgroundColor: '#dc3545' }]} onPress={confirmDeleteClaim}>
+                <Text style={styles.modalButtonText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Delete Result Modal */}
+      <Modal visible={showDeleteResultModal !== null} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>{showDeleteResultModal?.success ? 'Deleted' : 'Error'}</Text>
+            <Text style={styles.modalText}>{showDeleteResultModal?.message}</Text>
+            <TouchableOpacity style={[styles.modalButton, { backgroundColor: '#0d6efd' }]} onPress={handleCloseDeleteResultModal}>
+              <Text style={styles.modalButtonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
- 
-  button: {
-    backgroundColor: '#007bff',
-    paddingVertical: 12,
+  container: {
+    flexGrow: 1,
     paddingHorizontal: 20,
-    borderRadius: 5,
-    marginVertical: 5,
-    flex: 1,
+    paddingVertical: 10,
   },
-  buttonText: {
-    color: 'white',
+  backButton: {
+    marginTop: 20,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginVertical: 10,
+    textAlign: 'center',
+  },
+  detailCard: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+  },
+  label: {
+    fontWeight: 'bold',
+    marginVertical: 5,
+  },
+  value: {
+    marginBottom: 10,
+  },
+  proofImage: {
+    width: 300,
+    height: 200,
+    borderRadius: 10,
+    marginVertical: 10,
+  },
+  actionButton: {
+    paddingVertical: 12,
+    borderRadius: 8,
+    flex: 1,
+    marginVertical: 10,
+  },
+  actionButtonText: {
+    color: '#fff',
     textAlign: 'center',
     fontSize: 16,
   },
-  
-    container: {
-      flexGrow: 1,
-      paddingHorizontal: 20,
-      paddingVertical: 10,
-    },
-    backButton: {
-      marginTop: 20,
-    },
-    title: {
-      fontSize: 24,
-      fontWeight: 'bold',
-      marginVertical: 10,
-      textAlign: 'center',
-    },
-    detailCard: {
-      backgroundColor: '#fff',
-      borderRadius: 10,
-      padding: 20,
-      marginBottom: 20,
-      shadowColor: '#000',
-      shadowOpacity: 0.1,
-      shadowRadius: 10,
-    },
-    label: {
-      fontWeight: 'bold',
-      marginVertical: 5,
-    },
-    value: {
-      marginBottom: 10,
-    },
-    proofImage: {
-      width: 300,
-      height: 200,
-      borderRadius: 10,
-      marginVertical: 10,
-    },
-    actionButton: {
-      paddingVertical: 12,
-      borderRadius: 8,
-      flex: 1,
-      marginVertical: 10,
-    },
-    actionButtonText: {
-      color: '#fff',
-      textAlign: 'center',
-      fontSize: 16,
-    },
- 
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalBackground: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    width: '80%',
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  modalText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  modalButtonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-evenly',
+    width: '100%',
+  },
+  modalButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 30,
+    borderRadius: 8,
+  },
+  modalButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
 });
 
 export default YieldDetailsScreen;
+

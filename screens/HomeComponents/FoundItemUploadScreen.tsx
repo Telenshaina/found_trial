@@ -129,14 +129,11 @@ const FoundItemUploadScreen = () => {
       const imageUrl = supabase.storage.from('uploads').getPublicUrl(fileName).data.publicUrl;
       console.log('Uploaded Image URL:', imageUrl); // Debugging
   
-      // Step 1: Check for duplicate
+      // Step 1: Check for duplicate (case-insensitive)
       const { data: existingItems, error: fetchError } = await supabase
         .from('found_items')
         .select('*')
-        .eq('found_by', userId)
-        .eq('item_name', itemName)
-        .eq('category', category)
-        .eq('location_found', locationFound);
+        .eq('found_by', userId);
 
       if (fetchError) {
         console.error('Error checking for duplicates:', fetchError);
@@ -144,8 +141,20 @@ const FoundItemUploadScreen = () => {
         setIsUploading(false);
         return;
       }
+      
+      // Normalize input
+      const normalizedItemName = itemName.trim().toLowerCase();
+      const normalizedCategory = category.trim().toLowerCase();
+      const normalizedLocation = locationFound.trim().toLowerCase();
 
-      if (existingItems && existingItems.length > 0) {
+      // Check duplicates manually
+      const isDuplicate = existingItems?.some((item) =>
+        item.item_name.toLowerCase() === normalizedItemName &&
+        item.category.toLowerCase() === normalizedCategory &&
+        item.location_found.toLowerCase() === normalizedLocation
+      );
+
+      if (isDuplicate) {
         alert('You have already posted this item.');
         setIsUploading(false);
         return;
@@ -154,16 +163,16 @@ const FoundItemUploadScreen = () => {
       // Step 2: Insert found item
       const { error: dbError } = await supabase.from('found_items').insert([
         {
-          item_name: itemName,
-          category,
-          location_found: locationFound,
+          item_name: normalizedItemName,
+          category: normalizedCategory,
+          location_found: normalizedLocation,
           date_found: dateFound,
-          description,
-          tags: tags,
+          description: description.trim(),
+          tags: tags.map(tag => tag.trim().toLowerCase()),
           image_url: imageUrl,
           found_by: userId,
         },
-      ]);
+      ]);      
   
       if (dbError) {
         console.error('Database error:', dbError);

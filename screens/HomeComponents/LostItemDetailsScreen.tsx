@@ -133,6 +133,25 @@ const LostItemDetailsScreen = ({ route }: { route: any }) => {
      }
    };
   
+   const [itemStatus, setItemStatus] = useState<string | null>(null);
+
+useEffect(() => {
+  const fetchItemStatus = async () => {
+    const { data, error } = await supabase
+      .from('lost_items')
+      .select('status')
+      .eq('item_id', item.item_id)
+      .single();
+
+    if (data) {
+      setItemStatus(data.status);
+    } else if (error) {
+      console.error('Error fetching item status:', error);
+    }
+  };
+
+  fetchItemStatus();
+}, [item.item_id]);
 
   // Function to submit proof
   
@@ -220,9 +239,22 @@ const LostItemDetailsScreen = ({ route }: { route: any }) => {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.row}>
           <Text style={styles.itemName}>{item.item_name}</Text>
-          <View style={styles.unclaimedBadge}>
-            <Text style={styles.unclaimedText}>Unfound</Text>
-          </View>
+                {itemStatus && (
+        <View
+          style={[
+            styles.statusBadge,
+            itemStatus === 'returned'
+              ? styles.returnedBadge
+              : itemStatus === 'unfound'
+              ? styles.unfoundBadge
+              : styles.defaultBadge,
+          ]}
+        >
+          <Text style={styles.badgeText}>{itemStatus.charAt(0).toUpperCase() + itemStatus.slice(1)}</Text>
+        </View>
+      )}
+
+
         </View>
 
         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
@@ -357,16 +389,16 @@ const LostItemDetailsScreen = ({ route }: { route: any }) => {
       
             {/* Check Status Modal */}
             <Modal visible={isStatusModalVisible} animationType="fade" transparent>
-              <View style={styles.modalContainer}>
-                <View style={styles.statusModalContent}>
-                  <Text style={styles.modalTitle}>Item Status</Text>
-                  <Text style={styles.statusText}>Your uploaded item is currently being processed.</Text>
-                  <Text style={styles.statusText}>No one has claimed the Item you have uploaded</Text>
-                  <Text style={styles.infoText}>Check back later for updates.</Text>
-                  <Button title="Close" onPress={() => setStatusModalVisible(false)} />
-                </View>
-              </View>
-            </Modal>
+  <View style={styles.modalOverlay}> {/* 🔁 change from modalContainer to modalOverlay */}
+    <View style={styles.statusModalContent}>
+      <Text style={styles.modalTitle}>Item Status</Text>
+      <Text style={styles.statusText}>No one has claimed the Item you have uploaded</Text>
+      <Text style={styles.infoText}>Check back later for updates.</Text>
+      <Button title="Close" onPress={() => setStatusModalVisible(false)} />
+    </View>
+  </View>
+</Modal>
+
     </View>
   );
 };
@@ -390,8 +422,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 20 },
   itemName: { fontSize: 20, fontWeight: 'bold' },
   unclaimedBadge: { backgroundColor: '#FCE7F3', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  unclaimedText: { fontSize: 12, color: '#9D174D', fontWeight: 'bold' },
-
+  unclaimedText: { fontSize: 12, color: '#9D174D', fontWeight: 'bold' }, statusText: { fontSize: 16, marginVertical: 10, textAlign: 'center' },
   postedBy: { fontSize: 12, color: '#6B7280', marginTop: 4 },
   guestTag: {
     backgroundColor: '#FFD700',
@@ -443,9 +474,6 @@ const styles = StyleSheet.create({
   ownerNote: { fontSize: 14, color: '#059669', fontWeight: 'bold', textAlign: 'center', marginBottom: 8 },
   claimButton: { backgroundColor: '#000', paddingVertical: 14, borderRadius: 8, alignItems: 'center' },
   claimButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-
- 
-  statusText: { fontSize: 16, marginVertical: 10, textAlign: 'center' },
   infoText: { fontSize: 14, color: '#6B7280', marginBottom: 10, textAlign: 'center' }, // Add this line
   
   statusModalContent: {
@@ -462,11 +490,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   modalContainer: {
-    width: "90%",
-    backgroundColor: "#fff",
-    padding: 20,
+    width: '80%',
+    backgroundColor: 'white',
     borderRadius: 10,
-    elevation: 5,
+    padding: 20,
+    alignItems: 'center',
   },
   modalTitle: {
     fontSize: 20,
@@ -521,6 +549,32 @@ const styles = StyleSheet.create({
   errorInput: {
     borderColor: "red",
   },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    marginLeft: 8,
+  },
+  
+  returnedBadge: {
+    backgroundColor: '#4CAF50', // Green
+  },
+  
+  unfoundBadge: {
+    backgroundColor: '#F44336', // Red
+  },
+  
+  defaultBadge: {
+    backgroundColor: '#9E9E9E', // Grey fallback
+  },
+  
+  badgeText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  
 });
 
 export default LostItemDetailsScreen;

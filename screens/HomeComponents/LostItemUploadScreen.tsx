@@ -130,14 +130,11 @@ const LostItemUploadScreen = () => {
       const imageUrl = supabase.storage.from('uploads').getPublicUrl(fileName).data.publicUrl;
       console.log('Uploaded Image URL:', imageUrl); // Debugging
   
-      // Step 1: Check for duplicates
+      // Step 1: Check for duplicates (case-insensitive)
       const { data: existingItems, error: fetchError } = await supabase
         .from('lost_items')
         .select('*')
-        .eq('posted_by', userId)
-        .eq('item_name', itemName)
-        .eq('category', category)
-        .eq('last_seen_at', lastSeenAt);
+        .eq('posted_by', userId);
       
       if (fetchError) {
         console.error('Error checking for duplicates:', fetchError);
@@ -146,7 +143,19 @@ const LostItemUploadScreen = () => {
         return;
       }
 
-      if (existingItems && existingItems.length > 0) {
+      // Normalize input
+      const normalizedItemName = itemName.trim().toLowerCase();
+      const normalizedCategory = category.trim().toLowerCase();
+      const normalizedLocation = lastSeenAt.trim().toLowerCase();
+
+      // Check duplicates manually
+      const isDuplicate = existingItems?.some((item) =>
+        item.item_name.toLowerCase() === normalizedItemName &&
+        item.category.toLowerCase() === normalizedCategory &&
+        item.last_seen_at.toLowerCase() === normalizedLocation
+      );
+
+      if (isDuplicate) {
         alert('You have already posted this item.');
         setIsUploading(false);
         return;
@@ -155,12 +164,12 @@ const LostItemUploadScreen = () => {
       // Step 2: Insert lost item
       const { error: dbError } = await supabase.from('lost_items').insert([
         {
-          item_name: itemName,
-          category,
-          last_seen_at: lastSeenAt,
+          item_name: normalizedItemName,
+          category: normalizedCategory,
+          last_seen_at: normalizedLocation,
           date_lost: dateLost,
-          description,
-          tags: tags,
+          description: description.trim(),
+          tags: tags.map(tag => tag.trim().toLowerCase()),
           image_url: imageUrl,
           posted_by: userId, // Link the lost item to the authenticated user
         },

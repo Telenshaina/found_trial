@@ -90,40 +90,78 @@ const YieldsTransactionPage: React.FC = () => {
   const fetchYourYields = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+  
+      const { data: yieldsData, error: yieldsError } = await supabase
         .from("yields")
         .select("*")
         .eq("user_id", session?.user.id);
-
-      if (error) {
-        console.error("Error fetching yields:", error.message);
-      } else {
-        setYourYields(data || []);
+  
+      if (yieldsError) {
+        console.error("Error fetching yields:", yieldsError.message);
+        return;
       }
+  
+      const itemIds = yieldsData.map((item) => item.item_id);
+  
+      const { data: itemsData, error: itemsError } = await supabase
+        .from("lost_items")
+        .select("item_id, item_name")
+        .in("item_id", itemIds);
+  
+      if (itemsError) {
+        console.error("Error fetching item names:", itemsError.message);
+        return;
+      }
+  
+      const itemNameMap = new Map(itemsData.map((i: any) => [i.item_id, i.item_name]));
+  
+      const enrichedYields = yieldsData.map((y) => ({
+        ...y,
+        item_name: itemNameMap.get(y.item_id) || `Item #${y.item_id}`,
+      }));
+  
+      setYourYields(enrichedYields);
     } catch (error) {
       console.error("Unexpected error:", error);
     } finally {
       setLoading(false);
     }
   };
+  
 
   // fetch incoming yields based on lost items (claims on the current user's lost items)
   const fetchIncomingYields = async () => {
     try {
       setLoading(true);
       const itemIds = lostItems.map((item) => item.item_id);
-
+  
       if (itemIds.length > 0) {
-        const { data, error } = await supabase
-          .from("yields")
-          .select("*")
-          .in("item_id", itemIds) // find yields for lost items posted by the current user by ITEM ID
-          .order("created_at", { ascending: false });
-
-        if (error) {
-          console.error("Error fetching incoming yields:", error.message);
+        const [yieldRes, itemRes] = await Promise.all([
+          supabase
+            .from("yields")
+            .select("*")
+            .in("item_id", itemIds)
+            .order("created_at", { ascending: false }),
+  
+          supabase
+            .from("lost_items")
+            .select("item_id, item_name")
+            .in("item_id", itemIds),
+        ]);
+  
+        if (yieldRes.error || itemRes.error) {
+          console.error("Error fetching yields or item names:", yieldRes.error?.message || itemRes.error?.message);
         } else {
-          setIncomingYields(data || []);
+          // Map item_id to item_name
+          const itemNameMap = new Map(itemRes.data.map((i: any) => [i.item_id, i.item_name]));
+  
+          // Add item_name into each yield object
+          const yieldsWithNames = yieldRes.data.map((y: any) => ({
+            ...y,
+            item_name: itemNameMap.get(y.item_id) || `Item #${y.item_id}`,
+          }));
+  
+          setIncomingYields(yieldsWithNames);
         }
       } else {
         setIncomingYields([]);
@@ -134,6 +172,7 @@ const YieldsTransactionPage: React.FC = () => {
       setLoading(false);
     }
   };
+  
 
   const handleDelete = (yieldId: number) => {
     // Optional: show confirmation first
@@ -217,7 +256,7 @@ const YieldsTransactionPage: React.FC = () => {
               )}
               <View style={styles.itemInfo}>
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                  <Text style={styles.itemName}>Item #{item.item_id}</Text>
+                  <Text style={styles.itemName}>{item.item_name}</Text>
                   <TouchableOpacity onPress={() => handleDelete(item.yield_id)}>
                     <Ionicons name="trash-outline" size={20} color="#FF4C4C" />
                   </TouchableOpacity>
@@ -232,7 +271,7 @@ const YieldsTransactionPage: React.FC = () => {
                   <Text style={styles.statusText}>{item.status.toUpperCase()}</Text>
                 </View>
   
-                <Text style={styles.itemDescription}>{item.description}</Text>
+                <Text style={styles.itemDescription}>Date: {new Date(item.created_at).toLocaleDateString()}</Text>
               </View>
             </TouchableOpacity>
           )}
@@ -258,13 +297,15 @@ const YieldsTransactionPage: React.FC = () => {
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.itemCard}
-              onPress={() => handleItemPress(item, true)} 
+              onPress={() => handleItemPress(item, false)} 
             >
               {item.proof_url && (
                 <Image source={{ uri: item.proof_url }} style={styles.itemImage} />
               )}
               <View style={styles.itemInfo}>
-                <Text style={styles.itemName}>Item #{item.item_id}</Text>
+                {/* Replace item_id with item_name */}
+                <Text style={styles.itemName}>{item.item_name}</Text>
+  
                 <View
                   style={[
                     styles.statusTag,
@@ -273,7 +314,11 @@ const YieldsTransactionPage: React.FC = () => {
                 >
                   <Text style={styles.statusText}>{item.status}</Text>
                 </View>
-                <Text style={styles.itemDescription}>{item.description}</Text>
+  
+                {/* Replace description with formatted date */}
+                <Text style={styles.itemDescription}>
+                  Date: {new Date(item.created_at).toLocaleDateString()}
+                </Text>
               </View>
             </TouchableOpacity>
           )}
@@ -281,6 +326,7 @@ const YieldsTransactionPage: React.FC = () => {
       )}
     </View>
   );
+  
 
   const handleItemPress = (item: any, incoming: boolean) => {
     // Navigate to the YieldDetailsScreen and pass the yieldData and incoming flag
@@ -290,7 +336,6 @@ const YieldsTransactionPage: React.FC = () => {
     });
   };
   
- 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case "approved":

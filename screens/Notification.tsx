@@ -51,40 +51,54 @@ const Notification = () => {
 
   const handleNotificationPress = async (notification: any) => {
     const { item_id, receiver_id, sender_id } = notification;
-
-    // Update the notification to mark it as read
-    const { error } = await supabase
+  
+    // Mark as read
+    const { error: updateError } = await supabase
       .from("notifications")
       .update({ read: true })
       .eq("id", notification.id);
-
-    if (error) {
-      console.error("Error updating notification:", error);
+  
+    if (updateError) {
+      console.error("Error updating notification:", updateError);
     }
-
-    // Navigate to claim details
+  
+    // Fetch claim
     const { data: claim, error: claimError } = await supabase
-  .from("claims")
-  .select("*")
-  .or(
-    `and(found_by.eq.${receiver_id},user_id.eq.${sender_id}),and(found_by.eq.${sender_id},user_id.eq.${receiver_id})`
-  )
-  .eq("item_id", item_id)
-  .limit(1)
-  .maybeSingle();
-
-
+      .from("claims")
+      .select("*")
+      .or(
+        `and(found_by.eq.${receiver_id},user_id.eq.${sender_id}),and(found_by.eq.${sender_id},user_id.eq.${receiver_id})`
+      )
+      .eq("item_id", item_id)
+      .limit(1)
+      .maybeSingle();
+  
     if (claimError || !claim) {
       Alert.alert("Claim not found", "Unable to find the claim details.");
       console.error("Claim fetch error:", claimError);
       return;
     }
-
+  
+    // Fetch item name
+    const { data: item, error: itemError } = await supabase
+      .from("found_items")
+      .select("item_name")
+      .eq("item_id", item_id)
+      .single();
+  
+    if (itemError || !item) {
+      Alert.alert("Item not found", "Unable to find the item details.");
+      console.error("Item fetch error:", itemError);
+      return;
+    }
+  
     navigation.navigate("ClaimDetailsScreen", {
       claim,
       incoming: true,
+      
     });
   };
+  
 
   if (loading) {
     return (

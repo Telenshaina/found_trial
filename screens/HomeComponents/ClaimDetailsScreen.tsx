@@ -21,6 +21,12 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
   const [actionType, setActionType] = useState<'finder' | 'claimer' | null>(null);
   const [hasChatted, setHasChatted] = useState(false);
   const [claimStatus, setClaimStatus] = useState<string | null>(null);
+  const [showChatRequiredModal, setShowChatRequiredModal] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [modalActionType, setModalActionType] = useState<'approve' | 'reject' | null>(null);
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [showDeleteResultModal, setShowDeleteResultModal] = useState<{ success: boolean; message: string } | null>(null);
 
   const isFinder = userId === claim.found_by;
   const isClaimer = userId === claim.user_id;
@@ -53,68 +59,74 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
     fetchClaimStatus();
   }, [claim.claim_id]); 
 
-  const handleApproveClaim = async () => {
+  const handleApproveClaim = () => {
     if (!hasChatted) {
-      Alert.alert('Chat Required', 'You need to chat before taking action.');
+      setShowChatRequiredModal(true);
       return;
     }
-
-    try {
-      const { error } = await supabase
-        .from('claims')
-        .update({ status: 'approved' })
-        .eq('claim_id', claim.claim_id);
-
-      if (error) throw error;
-
-      Alert.alert('Success', 'Claim has been approved');
-      navigation.goBack();
-    } catch (error) {
-      console.error('Error approving claim:', error);
-      Alert.alert('Error', 'Failed to approve claim.');
-    }
-  };
-
-  const handleRejectClaim = async () => {
-    if (!hasChatted) {
-      Alert.alert('Chat Required', 'You need to chat before taking action.');
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from('claims')
-        .update({ status: 'rejected' })
-        .eq('claim_id', claim.claim_id);
-      
-      if (error) throw error;
-
-      Alert.alert('Success', 'Claim has been rejected.');
-      navigation.goBack();
-    } catch (error) {
-      console.error('Error rejecting claim:', error);
-      Alert.alert('Error', 'Failed to reject claim.');
-    }
+    setModalActionType('approve');
+    setShowConfirmModal(true);
   };
   
-  const handleDeleteClaim = async () => {
-    Alert.alert('Delete Claim', 'Are you sure you want to delete this claim?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          const { error } = await supabase.from('claims').delete().eq('claim_id', claim.claim_id);
-          if (error) {
-            Alert.alert('Error', 'Failed to delete claim.');
-          } else {
-            Alert.alert('Deleted', 'Claim has been deleted.');
-            navigation.goBack();
-          }
-        },
-      },
-    ]);
+  const handleRejectClaim = () => {
+    if (!hasChatted) {
+      setShowChatRequiredModal(true);
+      return;
+    }
+    setModalActionType('reject');
+    setShowConfirmModal(true);
+  };  
+  
+  const handleDeleteClaim = () => {
+    setShowDeleteConfirmModal(true);
+  };  
+
+  const performAction = async () => {
+    if (!modalActionType) return;
+  
+    try {
+      const { error } = await supabase
+        .from('claims')
+        .update({ status: modalActionType === 'approve' ? 'approved' : 'rejected' })
+        .eq('claim_id', claim.claim_id);
+  
+      if (error) throw error;
+  
+      setShowConfirmModal(false);
+      setShowSuccessModal(true);
+    } catch (error) {
+      console.error(`Error ${modalActionType} claim:`, error);
+      Alert.alert('Error', `Failed to ${modalActionType} claim.`);
+      setShowConfirmModal(false);
+    }
   };
+
+  const confirmDeleteClaim = async () => {
+    try {
+      const { error } = await supabase
+        .from('claims')
+        .delete()
+        .eq('claim_id', claim.claim_id);
+  
+      if (error) {
+        setShowDeleteResultModal({ success: false, message: 'Failed to delete item.' });
+      } else {
+        setShowDeleteResultModal({ success: true, message: 'Claim has been deleted.' });
+      }
+    } catch (error) {
+      console.error('Error deleting claim:', error);
+      setShowDeleteResultModal({ success: false, message: 'Failed to delete item.' });
+    } finally {
+      setShowDeleteConfirmModal(false); // hide confirmation modal
+    }
+  };
+
+  const handleCloseDeleteResultModal = () => {
+    if (showDeleteResultModal?.success) {
+      navigation.goBack(); // only navigate if deletion was successful
+    }
+    setShowDeleteResultModal(null);
+  };  
 
   // This will change the item's status to claimed in the found_items table
   const handleFinderConfirm = async () => {
@@ -188,12 +200,13 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
       const { data } = await supabase
         .from('chats')
         .select('*')
-        .or(`sender_id.eq.${claim.found_by},receiver_id.eq.${claim.user_id}`)
-        .or(`sender_id.eq.${claim.user_id},receiver_id.eq.${claim.found_by}`)
+        .or(
+          `and(sender_id.eq.${claim.found_by},receiver_id.eq.${claim.user_id}),and(sender_id.eq.${claim.user_id},receiver_id.eq.${claim.found_by})`
+        )
         .eq('claim_id', claim.claim_id);
-        setHasChatted(data && data.length > 0 ? true : false);
-
-    };
+    
+      setHasChatted(data && data.length > 0 ? true : false);
+    };    
     checkChatHistory();
   }, [claim]);
 
@@ -253,7 +266,7 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
     if (!error) Alert.alert('Success', 'Item received confirmed.');
   };
   
-  // Update claim status
+  // Update item status
   useEffect(() => {
     // Subscribe to changes in found_items table
     const channel = supabase
@@ -372,6 +385,98 @@ const ClaimDetailsScreen: React.FC<Props> = ({ route }) => {
           </TouchableOpacity>
         </View>
       )}
+      
+      {claimStatus === 'rejected' && (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 10 }}>
+          <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#dc3545' }]} onPress={handleDeleteClaim}>
+            <Text style={styles.actionButtonText}>Delete</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Modal for Chat Required */}
+      <Modal visible={showChatRequiredModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Chat Required</Text>
+            <Text style={styles.modalText}>You must chat with the other user before taking action.</Text>
+            <TouchableOpacity onPress={() => setShowChatRequiredModal(false)} style={[styles.modalButton, { backgroundColor: '#0d6efd' }]}>
+              <Text style={styles.modalButtonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal for Confirm Approve/Reject */}
+      <Modal visible={showConfirmModal} transparent animationType="fade">
+        <View style={styles.modalBackground}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>{modalActionType === 'approve' ? 'Confirm Approval' : 'Confirm Rejection'}</Text>
+            <Text style={styles.modalText}>
+              Are you sure you want to {modalActionType === 'approve' ? 'approve' : 'reject'} this claim?
+            </Text>
+
+            {/* FIXED button layout */}
+            <View style={styles.modalButtonContainer}>
+              <TouchableOpacity style={[styles.modalButton, { backgroundColor: '#dc3545' }]} onPress={() => setShowConfirmModal(false)}>
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={[styles.modalButton, { backgroundColor: '#28a745' }]} onPress={performAction}>
+                <Text style={styles.modalButtonText}>Confirm</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal for Success */}
+      <Modal visible={showSuccessModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Success</Text>
+            <Text style={styles.modalText}>Claim has been {modalActionType}ed successfully.</Text>
+            <TouchableOpacity onPress={() => { 
+              setShowSuccessModal(false); 
+              navigation.goBack();
+              }} style={styles.modalButton}>
+              <Text style={[styles.modalButtonText, { backgroundColor: '#0d6efd' }]}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal visible={showDeleteConfirmModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Delete Claim</Text>
+            <Text style={styles.modalText}>Are you sure you want to delete this claim?</Text>
+            <View style={styles.modalButtonContainer}>
+              <TouchableOpacity style={[styles.modalButton, { backgroundColor: '#a3a3a3' }]} onPress={() => setShowDeleteConfirmModal(false)}>
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={[styles.modalButton, { backgroundColor: '#dc3545' }]} onPress={confirmDeleteClaim}>
+                <Text style={styles.modalButtonText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Delete Result Modal */}
+      <Modal visible={showDeleteResultModal !== null} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>{showDeleteResultModal?.success ? 'Deleted' : 'Error'}</Text>
+            <Text style={styles.modalText}>{showDeleteResultModal?.message}</Text>
+            <TouchableOpacity style={[styles.modalButton, { backgroundColor: '#0d6efd' }]} onPress={handleCloseDeleteResultModal}>
+              <Text style={styles.modalButtonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -423,6 +528,50 @@ const styles = StyleSheet.create({
     color: '#fff',
     textAlign: 'center',
     fontSize: 16,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalBackground: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    width: '80%',
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  modalText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  modalButtonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-evenly',
+    width: '100%',
+  },
+  modalButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 30,
+    borderRadius: 8,
+  },
+  modalButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 

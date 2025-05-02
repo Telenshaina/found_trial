@@ -6,19 +6,19 @@ import type { RouteProp } from "@react-navigation/native";
 import { RootStackParamList } from "../../navigation/types";
 import { supabase } from "../../supabase";
 
-type ChatScreenRouteProp = RouteProp<RootStackParamList, "ChatScreen">;
+type ChatScreenRouteProp = RouteProp<RootStackParamList, "YieldChatScreen">;
 
-const ChatScreen = () => {
+const YieldChatScreen = () => {
   const route = useRoute<ChatScreenRouteProp>();
   const navigation = useNavigation();
 
-  const { uploader_id, item_name, claim_id } = route.params ?? {};
+  const { uploader_id, item_name, yield_id } = route.params ?? {};
   
-  if (!claim_id) {
+  if (!yield_id) {
     console.error("❌ claim_id is missing! Check navigation.");
     return (
       <View style={styles.container}>
-        <Text style={{ color: "red", fontSize: 16 }}>Error: Missing claim_id.</Text>
+        <Text style={{ color: "red", fontSize: 16 }}>Error: Missing yield_id.</Text>
       </View>
     );
   }
@@ -30,7 +30,7 @@ const ChatScreen = () => {
   const [rejectModalVisible, setRejectModalVisible] = useState(false);
   const [claimStatus, setClaimStatus] = useState<string | null>(null);
   const flatListRef = useRef<FlatList<any>>(null);
-  const isChatDisabled = claimStatus === "approved" || claimStatus === "completed";
+  const isChatDisabled = claimStatus === "rejected" || claimStatus === "claimed";
 
   useEffect(() => {
     const getUser = async () => {
@@ -45,9 +45,9 @@ const ChatScreen = () => {
   useEffect(() => {
     const fetchClaimStatus = async () => {
       const { data, error } = await supabase
-        .from("claims")
+        .from("yields")
         .select("status")
-        .eq("claim_id", claim_id)
+        .eq("yield_id", yield_id)
         .single();
 
       if (!error && data?.status) {
@@ -56,18 +56,18 @@ const ChatScreen = () => {
     };
 
     fetchClaimStatus();
-  }, [claim_id]);
+  }, [yield_id]);
 
   const receiverId = uploader_id;
 
   useEffect(() => {
     const fetchMessages = async () => {
-      if (!claim_id) return;
+      if (!yield_id) return;
   
       const { data, error } = await supabase
         .from("chats")
         .select("*")
-        .eq("claim_id", claim_id)
+        .eq("yield_id", yield_id)
         .order("created_at", { ascending: true });
 
       if (error) {
@@ -76,7 +76,7 @@ const ChatScreen = () => {
         if (data && data.length > 0) {
           setMessages(data);
         } else {
-          console.log("No messages for this claim_id.");
+          console.log("No messages for this yield_id.");
         }
       }
     };
@@ -84,10 +84,10 @@ const ChatScreen = () => {
     fetchMessages();
 
     const subscription = supabase
-      .channel(`chats:claim_id=${claim_id}`)
+      .channel(`chats:yield_id=${yield_id}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "chats", filter: `claim_id=eq.${claim_id}` },
+        { event: "INSERT", schema: "public", table: "chats", filter: `yield_id=eq.${yield_id}` },
         (payload) => {
           setMessages((prevMessages) => {
             const isDuplicate = prevMessages.some((msg) => msg.created_at === payload.new.created_at);
@@ -103,7 +103,7 @@ const ChatScreen = () => {
     return () => {
       supabase.removeChannel(subscription);
     };
-  }, [claim_id]);
+  }, [yield_id]);
 
   const handleSend = async () => {
     if (inputText.trim() === "" || !userId || isChatDisabled) return;
@@ -112,9 +112,9 @@ const ChatScreen = () => {
 
     if (userId === receiverId) {
       const { data, error } = await supabase
-        .from("claims")
+        .from("yields")
         .select("user_id")
-        .eq("claim_id", claim_id)
+        .eq("yield_id", yield_id)
         .single();
 
       if (error) {
@@ -126,7 +126,7 @@ const ChatScreen = () => {
     }
 
     const newMessage = {
-      claim_id,
+      yield_id,
       sender_id: userId,
       receiver_id: finalReceiverId,
       message: inputText,
@@ -144,28 +144,29 @@ const ChatScreen = () => {
   };
 
   const handleApprove = async () => {
-    if (!claim_id || !userId) return;
+    if (!yield_id || !userId) return;
 
     try {
       let { error: claimError } = await supabase
-        .from("claims")
+        .from("yields")
         .update({ status: "approved" })
-        .eq("claim_id", claim_id);
+        .eq("yield_id", yield_id);
 
       if (claimError) throw claimError;
 
       let { data: claimData, error: claimFetchError } = await supabase
-        .from("claims")
+        .from("yields")
         .select("item_id")
-        .eq("claim_id", claim_id)
-        .single();
+        .eq("yield_id", yield_id)
+        .maybeSingle();
 
-      if (claimFetchError || !claimData) throw claimFetchError;
+        if (claimFetchError || !claimData) throw claimFetchError ?? new Error("No matching yield found.");
+
 
       const itemId = claimData.item_id;
 
       let { error: itemError } = await supabase
-        .from("found_items")
+        .from("lost_items")
         .update({ status: "return_pending" })
         .eq("item_id", itemId);
 
@@ -180,13 +181,13 @@ const ChatScreen = () => {
   };
 
   const handleReject = async () => {
-    if (!claim_id || !userId) return;
+    if (!yield_id || !userId) return;
   
     try {
       let { error: claimError } = await supabase
-        .from("claims")
+        .from("yields")
         .update({ status: "rejected" })
-        .eq("claim_id", claim_id);
+        .eq("yield_id", yield_id);
   
       if (claimError) throw claimError;
   
@@ -231,7 +232,7 @@ const ChatScreen = () => {
         )}
         contentContainerStyle={{ paddingVertical: 20 }}
       />
-      {!isChatDisabled && (
+      {claimStatus === 'pending' && (
         <>
           <View style={styles.approvalWarningBox}>
             <Text style={styles.approvalWarningText}>
@@ -463,4 +464,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ChatScreen;
+export default YieldChatScreen;

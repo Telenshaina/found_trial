@@ -7,15 +7,15 @@ import { supabase } from '../../supabase';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
-type TransactionScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'TransactionScreen'>;
-type TransactionScreenRouteProp = RouteProp<RootStackParamList, 'TransactionScreen'>;
+type TransactionScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'TransactionScreenYield'>;
+type TransactionScreenRouteProp = RouteProp<RootStackParamList, 'TransactionScreenYield'>;
 
 type Props = {
   route: TransactionScreenRouteProp;
 };
 
 const TransactionScreenYield: React.FC<Props> = ({ route }) => {
-  const { claim } = route.params;
+  const { yieldData } = route.params;
   const navigation = useNavigation<TransactionScreenNavigationProp>();
   const [proof, setProof] = useState<{ image: string; date: string; time: string; place: string } | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
@@ -30,8 +30,8 @@ const TransactionScreenYield: React.FC<Props> = ({ route }) => {
   const [isReturnConfirmed, setIsReturnConfirmed] = useState(false); // New state to track return confirmation
   const [isReceivedConfirmed, setIsReceivedConfirmed] = useState(false); 
 
-  const isFinder = userId === claim.lost_by;
-  const isClaimer = userId === claim.yield_id;
+  const isFinder = userId === yieldData.lost_by;
+  const isClaimer = userId === yieldData.yield_id;
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -64,16 +64,16 @@ const TransactionScreenYield: React.FC<Props> = ({ route }) => {
         setName("Unknown User");
       }
     };
-    fetchUserName(claim.found_by, setFounderName);
-    fetchUserName(claim.user_id, setClaimerName);
-  }, [claim.found_by, claim.user_id]);
+    fetchUserName(yieldData.lost_by, setFounderName);
+    fetchUserName(yieldData.user_id, setClaimerName);
+  }, [yieldData.lost_by, yieldData.user_id]);
 
   useEffect(() => {
     const fetchProof = async () => {
       const { data, error } = await supabase
         .from('proof_of_return')
         .select('image, date, time, place')
-        .eq('claim_id', claim.claim_id)
+        .eq('yield_id', yieldData.yield_id)
         .single();
       if (error) {
         console.error('Error fetching proof:', error.message);
@@ -82,7 +82,7 @@ const TransactionScreenYield: React.FC<Props> = ({ route }) => {
       }
     };
     fetchProof();
-  }, [claim.claim_id]);
+  }, [yieldData.yield_id]);
 
   // Pick image from gallery
   const pickImage = async () => {
@@ -151,7 +151,7 @@ const TransactionScreenYield: React.FC<Props> = ({ route }) => {
       // Insert proof of return data into 'proof_of_return' table
       const { error: dbError } = await supabase.from('proof_of_return').insert([
         {
-          yield_id: claim.yield_id,
+          yield_id: yieldData.yield_id,
           image: imageUrl,
           date,
           time,
@@ -178,7 +178,7 @@ const TransactionScreenYield: React.FC<Props> = ({ route }) => {
       const { error } = await supabase
         .from('proof_of_return')
         .delete()
-        .eq('claim_id', claim.claim_id);
+        .eq('yield_id', yieldData.yield_id);
       
       if (error) {
         console.error('Error deleting proof:', error.message);
@@ -219,7 +219,7 @@ const TransactionScreenYield: React.FC<Props> = ({ route }) => {
     const { data, error } = await supabase
     .from('yields') 
     .select('yielder_confirmed, owner_confirmed, item_id, user_id') 
-    .eq('yield_id', claim.yield_id) 
+    .eq('yield_id', yieldData.yield_id) 
     .single();
   
     if (error || !data) {
@@ -249,7 +249,7 @@ const TransactionScreenYield: React.FC<Props> = ({ route }) => {
         .update({
           status: 'claimed'
         })
-        .eq('yield_id', claim.yield_id);
+        .eq('yield_id', yieldData.yield_id);
   
       if (updateClaimError) {
         console.error('Error updating claim status:', updateClaimError.message);
@@ -266,7 +266,7 @@ const TransactionScreenYield: React.FC<Props> = ({ route }) => {
       const { error } = await supabase
         .from('yields')
         .update({ yielder_confirmed: true })
-        .eq('yield_id', claim.yield_id);
+        .eq('yield_id', yieldData.yield_id);
       
       if (error) throw error;
   
@@ -283,7 +283,7 @@ const TransactionScreenYield: React.FC<Props> = ({ route }) => {
       const { error } = await supabase
         .from('yields')
         .update({ owner_confirmed: true })
-        .eq('yield_id', claim.yield_id);
+        .eq('yield_id', yieldData.yield_id);
   
       if (error) throw error;
   
@@ -300,7 +300,7 @@ const TransactionScreenYield: React.FC<Props> = ({ route }) => {
       const { data, error } = await supabase
         .from('yield')
         .select('yielder_confirmed, owner_confirmed')
-        .eq('yield_id', claim.yield_id)
+        .eq('yield_id', yieldData.yield_id)
         .single();
   
       if (error) {
@@ -314,7 +314,7 @@ const TransactionScreenYield: React.FC<Props> = ({ route }) => {
       }
     };
     fetchConfirmationStatus();
-  }, [claim.claim_id]);
+  }, [yieldData.yield_id]);
   
   return (
     <View style={styles.container}>
@@ -323,7 +323,7 @@ const TransactionScreenYield: React.FC<Props> = ({ route }) => {
       </TouchableOpacity>
 
       <Text style={styles.title}>Transaction Details</Text>
-      <Text style={styles.itemText}>Item: {claim.item_name}</Text>
+      <Text style={styles.itemText}>Item: {yieldData.item_name}</Text>
       <Text style={styles.itemText}>Finder: {founderName ?? 'Loading...'}</Text>
       <Text style={styles.itemText}>Claimer: {claimerName ?? 'Loading...'}</Text>
 

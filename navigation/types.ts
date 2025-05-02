@@ -27,6 +27,7 @@ export type RootStackParamList = {
 
   // Updated ChatScreen to include user_id
   ChatScreen: { claim_id: string; user_id: string; uploader_id: string; item_name: string }; // add user_id here
+  YieldChatScreen: { yield_id: string; user_id: string; uploader_id: string; item_name: string }; // add user_id here
 };
 
 // Type for navigation prop

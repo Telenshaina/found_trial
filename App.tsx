@@ -12,10 +12,12 @@ import LostItemUploadScreen from "./screens/HomeComponents/LostItemUploadScreen"
 import FoundItemUploadScreen from "./screens/HomeComponents/FoundItemUploadScreen";
 import TransactionPage from "./screens/HomeComponents/TransactionPage";
 import TransactionScreen from "./screens/HomeComponents/TransactionScreen";
+import TransactionScreenYield from "./screens/HomeComponents/TransactionScreenYield";
 import YieldsTransactionPage from "./screens/HomeComponents/YieldsTransactionPage";
 import ClaimedItems from "./screens/HomeComponents/ClaimedItems";
 import ClaimDetailsScreen from "./screens/HomeComponents/ClaimDetailsScreen";
 import ChatScreen from "./screens/HomeComponents/ChatScreen";
+import YieldChatScreen from "./screens/HomeComponents/YieldChatScreen";
 import AuthChecker from "./screens/AuthChecker"; 
 import YieldDetailsScreen from "./screens/HomeComponents/YieldDetailsScreen";
 import ListOfFoundItems from "./screens/HomeComponents/ListOfFoundItems"; 
@@ -39,6 +41,7 @@ export type RootStackParamList = {
   FoundItemUploadScreen: undefined;
   TransactionPage: undefined;
   TransactionScreen: { claim: any };
+  TransactionScreenYield: {yieldData: any}
   YieldsTransactionPage: undefined;
   ClaimedItems: undefined;
   ClaimDetailsScreen: { claim: any; incoming: boolean };
@@ -47,6 +50,7 @@ export type RootStackParamList = {
   ListOfCategorizedItems: { title: string }; 
   ListOfAllSurrenderedItems: undefined; 
   ChatScreen: { uploader_id: string; item_name: string };
+  YieldChatScreen: {uploader_id: string; item_name: string }; // add user_id here
   Banned: undefined;
   YieldDetailsScreen: {
     yieldData: any;
@@ -80,6 +84,7 @@ const App = () => {
         <Stack.Screen name="FoundItemUploadScreen" component={FoundItemUploadScreen} />
         <Stack.Screen name="TransactionPage" component={TransactionPage} />
         <Stack.Screen name="TransactionScreen" component={TransactionScreen} />
+        <Stack.Screen name="TransactionScreenYield" component={TransactionScreenYield} />
         <Stack.Screen name="YieldsTransactionPage" component={YieldsTransactionPage} />
         <Stack.Screen name="ClaimedItems" component={ClaimedItems} />
         <Stack.Screen name="ClaimDetailsScreen" component={ClaimDetailsScreen} />
@@ -87,6 +92,11 @@ const App = () => {
         <Stack.Screen
           name="ChatScreen"
           component={ChatScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="YieldChatScreen"
+          component={YieldChatScreen}
           options={{ headerShown: false }}
         />
         <Stack.Screen 

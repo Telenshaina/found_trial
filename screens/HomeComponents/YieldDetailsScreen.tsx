@@ -261,25 +261,35 @@ const YieldDetailsScreen: React.FC<Props> = ({ route }) => {
   // Handle confirmation update
   useEffect(() => {
     const checkChatHistory = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('chats')
-        .select('*')
-        .or(`sender_id.eq.${yieldData.found_by},receiver_id.eq.${yieldData.user_id}`)
-        .or(`sender_id.eq.${yieldData.user_id},receiver_id.eq.${yieldData.found_by}`)
+        .select('chat_id')
         .eq('yield_id', yieldData.yield_id);
-        setHasChatted(data && data.length > 0 ? true : false);
-
+    
+      if (error) {
+        console.error('Error checking chat history:', error.message);
+        setHasChatted(false);
+        return;
+      }
+    
+      if (!data || data.length === 0) {
+        setHasChatted(false);
+      } else {
+        setHasChatted(true);
+      }
     };
+    
     checkChatHistory();
   }, [yieldData]);
 
   const handleChatPress = () => {
-    navigation.navigate('ChatScreen', {
+    navigation.navigate('YieldChatScreen', {
       uploader_id: yieldData.found_by,
       item_name: yieldData.item_name,
-      claim_id: yieldData.yield_id,
+      yield_id: yieldData.yield_id, 
       user_id: yieldData.user_id,
     });
+    
   };
 
   const handleStatusUpdate = async (status: 'approved' | 'rejected') => {

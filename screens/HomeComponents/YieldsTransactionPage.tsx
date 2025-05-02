@@ -1,0 +1,506 @@
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  useWindowDimensions,
+  TouchableOpacity,
+  FlatList,
+  Image,
+  ActivityIndicator, Alert
+} from "react-native";
+import { useNavigation } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
+import { TabView, SceneMap, TabBar } from "react-native-tab-view";
+import { supabase } from "../../supabase"; // adjust path if needed
+import { Session } from "@supabase/supabase-js";
+import { RootStackParamList } from "../../navigation/types";
+import { StackNavigationProp } from '@react-navigation/stack';
+
+const YieldsTransactionPage: React.FC = () => {
+  const layout = useWindowDimensions();
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+
+  const [index, setIndex] = useState(0);
+  const [routes] = useState([
+    { key: "lostItems", title: "Your Lost Items" },
+    { key: "incomingYields", title: "Incoming Yields" },
+    { key: "yourYields", title: "Your Yields" },
+  ]);
+
+  const [lostItems, setLostItems] = useState<any[]>([]);
+  const [yourYields, setYourYields] = useState<any[]>([]); // state for yields
+  const [incomingYields, setIncomingYields] = useState<any[]>([]); // state for incoming yields
+  const [loading, setLoading] = useState(false);
+  const [session, setSession] = useState<Session | null>(null);
+
+  useEffect(() => {
+    const fetchSession = async () => {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) {
+        console.log("Error fetching session:", error.message);
+      } else {
+        setSession(data.session);
+      }
+    };
+    fetchSession();
+  }, []);
+
+  // fetch lost items
+  useEffect(() => {
+    if (session) {
+      fetchLostItems();
+    }
+  }, [session]);
+
+  // your yields or reported by user
+  useEffect(() => {
+    if (session) {
+      fetchYourYields();
+    }
+  }, [session]);
+
+  // incoming yields (to > lsotItem)
+  useEffect(() => {
+    if (session) {
+      fetchIncomingYields();
+    }
+  }, [lostItems]);
+
+  const fetchLostItems = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("lost_items")
+        .select("*")
+        .eq("posted_by", session?.user.id);
+
+      if (error) {
+        console.error("Error fetching lost items:", error.message);
+      } else {
+        setLostItems(data || []);
+      }
+    } catch (error) {
+      console.error("Unexpected error:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchYourYields = async () => {
+    try {
+      setLoading(true);
+  
+      const { data: yieldsData, error: yieldsError } = await supabase
+        .from("yields")
+        .select("*")
+        .eq("user_id", session?.user.id);
+  
+      if (yieldsError) {
+        console.error("Error fetching yields:", yieldsError.message);
+        return;
+      }
+  
+      const itemIds = yieldsData.map((item) => item.item_id);
+  
+      const { data: itemsData, error: itemsError } = await supabase
+        .from("lost_items")
+        .select("item_id, item_name")
+        .in("item_id", itemIds);
+  
+      if (itemsError) {
+        console.error("Error fetching item names:", itemsError.message);
+        return;
+      }
+  
+      const itemNameMap = new Map(itemsData.map((i: any) => [i.item_id, i.item_name]));
+  
+      const enrichedYields = yieldsData.map((y) => ({
+        ...y,
+        item_name: itemNameMap.get(y.item_id) || `Item #${y.item_id}`,
+      }));
+  
+      setYourYields(enrichedYields);
+    } catch (error) {
+      console.error("Unexpected error:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+
+  // fetch incoming yields based on lost items (claims on the current user's lost items)
+  const fetchIncomingYields = async () => {
+    try {
+      setLoading(true);
+      const itemIds = lostItems.map((item) => item.item_id);
+  
+      if (itemIds.length > 0) {
+        const [yieldRes, itemRes] = await Promise.all([
+          supabase
+            .from("yields")
+            .select("*")
+            .in("item_id", itemIds)
+            .order("created_at", { ascending: false }),
+  
+          supabase
+            .from("lost_items")
+            .select("item_id, item_name")
+            .in("item_id", itemIds),
+        ]);
+  
+        if (yieldRes.error || itemRes.error) {
+          console.error("Error fetching yields or item names:", yieldRes.error?.message || itemRes.error?.message);
+        } else {
+          // Map item_id to item_name
+          const itemNameMap = new Map(itemRes.data.map((i: any) => [i.item_id, i.item_name]));
+  
+          // Add item_name into each yield object
+          const yieldsWithNames = yieldRes.data.map((y: any) => ({
+            ...y,
+            item_name: itemNameMap.get(y.item_id) || `Item #${y.item_id}`,
+          }));
+  
+          setIncomingYields(yieldsWithNames);
+        }
+      } else {
+        setIncomingYields([]);
+      }
+    } catch (error) {
+      console.error("Unexpected error fetching incoming yields:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+
+  const handleDelete = (yieldId: number) => {
+    // Optional: show confirmation first
+    Alert.alert(
+      "Delete Item",
+      "Are you sure you want to delete this item?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            // Perform the delete logic here
+            const updatedYields = incomingYields.filter(item => item.yield_id !== yieldId);
+            setIncomingYields(updatedYields);
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+  
+  const renderLostItems = () => (
+    <View style={styles.tabContainer}>
+      {loading ? (
+        <ActivityIndicator size="large" color="black" />
+      ) : lostItems.length === 0 ? (
+        <View style={styles.blankContainer}>
+          <Text style={styles.blankText}>No lost items yet.</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={lostItems}
+          keyExtractor={(item) => item.item_id.toString()}
+          contentContainerStyle={styles.cardListContainer}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+            style={styles.itemCard}
+            onPress={() => navigation.navigate('LostItemDetails', { item })}
+          >
+              
+              {item.image_url && (
+                <Image source={{ uri: item.image_url }} style={styles.itemImage} />
+              )}
+              <View style={styles.itemInfo}>
+                <Text style={styles.itemName}>{item.item_name}</Text>
+                <Text style={styles.itemCategory}>{item.category}</Text>
+                <Text style={styles.itemDescription}>{item.description}</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+        />
+      )}
+    </View>
+  );
+
+  const renderIncomingYields = () => (
+    <View style={styles.tabContainer}>
+      {loading ? (
+        <ActivityIndicator size="large" color="black" />
+      ) : incomingYields.length === 0 ? (
+        <View style={styles.blankContainer}>
+          <Text style={styles.blankText}>No incoming yield claims yet.</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={incomingYields}
+          keyExtractor={(item) => item.yield_id.toString()}
+          contentContainerStyle={styles.cardListContainer}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={styles.itemCard}
+              onPress={() => handleItemPress(item, true)} 
+              activeOpacity={0.8}
+            >
+              {item.proof_url && (
+                <Image source={{ uri: item.proof_url }} style={styles.itemImage} />
+              )}
+              <View style={styles.itemInfo}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <Text style={styles.itemName}>{item.item_name}</Text>
+                  <TouchableOpacity onPress={() => handleDelete(item.yield_id)}>
+                    <Ionicons name="trash-outline" size={20} color="#FF4C4C" />
+                  </TouchableOpacity>
+                </View>
+  
+                <View
+                  style={[
+                    styles.statusTag,
+                    { backgroundColor: getStatusColor(item.status) },
+                  ]}
+                >
+                  <Text style={styles.statusText}>{item.status.toUpperCase()}</Text>
+                </View>
+  
+                <Text style={styles.itemDescription}>Date: {new Date(item.created_at).toLocaleDateString()}</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+        />
+      )}
+    </View>
+  );
+  
+
+  const renderYourYields = () => (
+    <View style={styles.tabContainer}>
+      {loading ? (
+        <ActivityIndicator size="large" color="black" />
+      ) : yourYields.length === 0 ? (
+        <View style={styles.blankContainer}>
+          <Text style={styles.blankText}>You have no yield claims yet.</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={yourYields}
+          keyExtractor={(item) => item.yield_id.toString()}
+          contentContainerStyle={styles.cardListContainer}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={styles.itemCard}
+              onPress={() => handleItemPress(item, false)} 
+            >
+              {item.proof_url && (
+                <Image source={{ uri: item.proof_url }} style={styles.itemImage} />
+              )}
+              <View style={styles.itemInfo}>
+                {/* Replace item_id with item_name */}
+                <Text style={styles.itemName}>{item.item_name}</Text>
+  
+                <View
+                  style={[
+                    styles.statusTag,
+                    { backgroundColor: getStatusColor(item.status) },
+                  ]}
+                >
+                  <Text style={styles.statusText}>{item.status}</Text>
+                </View>
+  
+                {/* Replace description with formatted date */}
+                <Text style={styles.itemDescription}>
+                  Date: {new Date(item.created_at).toLocaleDateString()}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          )}
+        />
+      )}
+    </View>
+  );
+  
+
+  const handleItemPress = (item: any, incoming: boolean) => {
+    // Navigate to the YieldDetailsScreen and pass the yieldData and incoming flag
+    navigation.navigate('YieldDetailsScreen', {
+      yieldData: item,
+      incoming: incoming,
+    });
+  };
+  
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case "approved":
+        return "#4CAF50"; // green
+      case "rejected":
+        return "#FF4C4C"; // red
+      case "pending":
+        return "#FFA500"; // yellow
+      default:
+        return "#888"; // gray
+    }
+  };
+
+  const renderScene = SceneMap({
+    lostItems: renderLostItems,
+    incomingYields: renderIncomingYields,
+    yourYields: renderYourYields,
+  });
+
+  const renderDescription = () => {
+    if (index === 0) {
+      return (
+        <View style={styles.descriptionContainer}>
+          <Text style={styles.boldText}>Lost something?</Text>
+          <Text style={styles.descriptionText}>
+            This section shows all your reported lost items. Track their status and wait for someone to find them!
+          </Text>
+        </View>
+      );
+    } else if (index === 1) {
+      return (
+        <View style={styles.descriptionContainer}>
+          <Text style={styles.boldText}>Someone found your lost item!</Text>
+          <Text style={styles.descriptionText}>
+            Review the claims here and get ready to reunite with your belongings.
+          </Text>
+        </View>
+      );
+    } else if (index === 2) {
+      return (
+        <View style={styles.descriptionContainer}>
+          <Text style={styles.boldText}>You’ve found something!</Text>
+          <Text style={styles.descriptionText}>
+            Here are the items you’ve discovered and reported. Help others by returning what they’ve lost!
+          </Text>
+        </View>
+      );
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      {/* Back Button */}
+      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <Ionicons name="arrow-back" size={24} color="black" />
+      </TouchableOpacity>
+
+      <Text style={styles.title}>Lost Items Center</Text>
+
+      <TabView
+        navigationState={{ index, routes }}
+        renderScene={renderScene}
+        onIndexChange={setIndex}
+        initialLayout={{ width: layout.width }}
+        renderTabBar={(props) => (
+          <View>
+            <TabBar
+              {...props}
+              indicatorStyle={{ backgroundColor: "black" }}
+              style={{ backgroundColor: "white" }}
+              activeColor="black"
+              inactiveColor="gray"
+            />
+            {/* Description inside the TabBar, below the tabs */}
+            <View style={styles.descriptionContainer}>
+              {renderDescription()}
+            </View>
+          </View>
+        )}
+      />
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: { flex: 1, padding: 20, backgroundColor: "#fff" },
+  backButton: { marginBottom: 20 },
+  title: {
+    textAlign: "center",
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 10,
+    color: "black",
+  },
+  descriptionContainer: {
+    padding: 15,
+    backgroundColor: "#f9f9f9",
+    alignItems: "center",
+  },
+  boldText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    textAlign: "center", 
+    marginBottom: 5,  
+  },
+  descriptionText: {
+    fontSize: 14,
+    color: "#555",
+    textAlign: "center",  
+  },
+  tabContainer: {
+    flex: 1,
+    backgroundColor: "#fff",
+    paddingHorizontal: 10,
+  },
+  blankContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  blankText: {
+    fontSize: 16,
+    color: "#888",
+  },
+  cardListContainer: {
+    paddingTop: 10,
+  },
+  itemCard: {
+    flexDirection: "row",
+    backgroundColor: "#f0f0f0",
+    borderRadius: 8,
+    marginBottom: 10,
+    padding: 10,
+  },
+  itemImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    marginRight: 15,
+  },
+  itemInfo: {
+    flex: 1,
+    flexDirection: 'column'
+  },
+  itemName: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 8,
+  },
+  itemCategory: {
+    fontSize: 14,
+    color: "#777",
+  },
+  itemDescription: {
+    fontSize: 12,
+    color: "#555",
+  },
+  statusTag: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  statusText: { color: "#fff", fontWeight: "bold", fontSize: 12, textTransform: "uppercase" },
+});
+
+export default YieldsTransactionPage;

@@ -81,7 +81,7 @@ const ChatScreen = () => {
       }
     };
 
-    fetchMessages();
+    fetchMessages(); //ee
 
     const subscription = supabase
       .channel(`chats:claim_id=${claim_id}`)
@@ -214,6 +214,8 @@ const ChatScreen = () => {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Chat about {item_name}</Text>
       </View>
+
+
 
       <FlatList
         ref={flatListRef}

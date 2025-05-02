@@ -1,4 +1,10 @@
 {
+  "homepage": "https://Telenshaina.github.io/found-trial",
+"scripts": {
+  "predeploy": "npm run build",
+  "deploy": "gh-pages -d build" 
+},
+
   "name": "foundneu",
   "version": "1.0.0",
   "main": "index.ts",
@@ -35,6 +41,7 @@
     "expo-secure-store": "^14.0.1",
     "expo-status-bar": "~2.0.1",
     "expo-web-browser": "~14.0.2",
+    "gh-pages": "^6.3.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-native": "0.76.7",
